@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Reads and trains an adaptive logistic regression model on the 20 newsgroups data.
@@ -141,7 +142,7 @@ public final class TrainNewsGroups {
 
     encoder.setProbes(2);
     AdaptiveLogisticRegression learningAlgorithm = new AdaptiveLogisticRegression(20, FEATURES, new L1());
-    learningAlgorithm.setInterval(800);
+    learningAlgorithm.setInterval(1300);
     learningAlgorithm.setAveragingWindow(500);
 
     List<File> files = Lists.newArrayList();
@@ -274,8 +275,8 @@ public final class TrainNewsGroups {
     List<ModelDissector.Weight> weights = md.summary(100);
     for (ModelDissector.Weight w : weights) {
       System.out.printf("%s\t%.1f\t%s\t%.1f\t%s\t%.1f\t%s\n",
-                        w.getFeature(), w.getWeight(), ngNames.get(w.getMaxImpact() + 1),
-                        w.getCategory(1), w.getWeight(1), w.getCategory(2), w.getWeight(2));
+        w.getFeature(), w.getWeight(), ngNames.get(w.getMaxImpact() + 1),
+        w.getWeight(1), ngNames.get(w.getCategory(1)), w.getWeight(2), ngNames.get(w.getCategory(2)));
     }
   }
 
