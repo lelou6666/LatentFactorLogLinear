@@ -183,7 +183,7 @@ public class ModelDissector {
       return categories.get(n).weight;
     }
 
-    public double getCategory(int n) {
+    public int getCategory(int n) {
       return categories.get(n).index;
     }
 
