@@ -88,13 +88,11 @@ public class AdaptiveLogisticRegression implements OnlineLearner, Writable {
   }
 
   public AdaptiveLogisticRegression(int numCategories, int numFeatures, PriorFunction prior) {
-    this.numFeatures = numFeatures;
-    seed = new State<Wrapper, CrossFoldLearner>(new double[2], 10);
+    seed = new State<Wrapper>(new double[2], 10);
     Wrapper w = new Wrapper(numCategories, numFeatures, prior);
+    this.numFeatures = w.getLearner().getNumFeatures();
     seed.setPayload(w);
-
     w.setMappings(seed);
-    seed.setPayload(w);
     setPoolSize(poolSize);
   }
 
