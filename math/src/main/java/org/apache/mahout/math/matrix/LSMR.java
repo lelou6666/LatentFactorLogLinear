@@ -24,9 +24,6 @@ import org.apache.mahout.math.function.Functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Solves sparse least-squares using the LSMR algorithm.
  * <p/>
@@ -297,6 +294,7 @@ public class LSMR {
     //------------------------------------------------------------------
     //     Main iteration loop.
     //------------------------------------------------------------------
+    Matrix At = A.transpose();
     while (iteration <= iterationLimit && stop == StopCode.CONTINUE) {
 
       iteration = iteration + 1;
@@ -315,7 +313,7 @@ public class LSMR {
         if (localOrtho) {
           localVEnqueue(v);
         }
-        v = A.transpose().times(u).minus(v.times(beta));
+        v = At.times(u).minus(v.times(beta));
         // local-reorthogonalization of V
         if (localOrtho) {
           v = localVOrtho(v);
