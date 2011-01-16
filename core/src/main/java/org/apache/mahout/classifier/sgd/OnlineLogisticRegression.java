@@ -18,10 +18,7 @@
 package org.apache.mahout.classifier.sgd;
 
 import com.google.common.base.Preconditions;
-<<<<<<< HEAD
 import org.apache.hadoop.io.Writable;
-=======
->>>>>>> Made ALR and CFL be polymorphic by using the new AdjustableOnlineLearner
 import org.apache.mahout.math.DenseMatrix;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.MatrixWritable;
@@ -37,6 +34,7 @@ import java.io.IOException;
  */
 public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression implements AdjustableOnlineLearner {
   public static final int WRITABLE_VERSION = 1;
+
   // these next two control decayFactor^steps exponential type of annealing
   // learning rate and decay factor
   private double mu0 = 1;
