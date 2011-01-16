@@ -17,14 +17,15 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import org.apache.hadoop.io.Writable;
 import org.apache.mahout.classifier.OnlineLearner;
 import org.apache.mahout.classifier.VectorClassifier;
 
 /**
- * Created by IntelliJ IDEA. User: tdunning Date: Oct 14, 2010 Time: 12:00:55 PM To change this
- * template use File | Settings | File Templates.
+ * Encodes the minimal common characteristics of a learning algorithm that can be tuned
+ * by an evolutionary process.
  */
-public interface AdjustableOnlineLearner extends OnlineLearner, VectorClassifier {
+public interface AdjustableOnlineLearner extends OnlineLearner, VectorClassifier, Writable {
   AdjustableOnlineLearner lambda(double lambda);
 
   AdjustableOnlineLearner learningRate(double learningRate);

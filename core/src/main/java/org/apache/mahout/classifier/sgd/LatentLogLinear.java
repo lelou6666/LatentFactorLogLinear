@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,7 @@ import org.apache.mahout.math.DenseMatrix;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.function.UnaryFunction;
+import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.list.IntArrayList;
 
 import java.util.Random;
@@ -223,7 +223,7 @@ public class LatentLogLinear implements OnlineLearner {
 
     @Override
     public void regularize(Vector instance) {
-      beta.assign(new UnaryFunction() {
+      beta.assign(new DoubleFunction() {
         @Override
         public double apply(double arg1) {
           double newValue = arg1 - getLambda() * currentLearningRate() * Math.signum(arg1);
@@ -243,7 +243,7 @@ public class LatentLogLinear implements OnlineLearner {
 
     private void initializeWeights(int id) {
       if (updates.get(id) < 0) {
-        weights.getRow(id).assign(new UnaryFunction() {
+        weights.getRow(id).assign(new DoubleFunction() {
           @Override
           public double apply(double arg1) {
             return rand.nextGaussian();

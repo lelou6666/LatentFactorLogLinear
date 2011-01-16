@@ -18,6 +18,7 @@
 package org.apache.mahout.classifier.sgd;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.io.Writable;
 import org.apache.mahout.math.DenseMatrix;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.MatrixWritable;
@@ -31,7 +32,9 @@ import java.io.IOException;
  * Extends the basic on-line logistic regression learner with a specific set of learning
  * rate annealing schedules.
  */
-public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression implements AdjustableOnlineLearner {
+public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression implements AdjustableOnlineLearner, Writable {
+  public static final int WRITABLE_VERSION = 1;
+
   // these next two control decayFactor^steps exponential type of annealing
   // learning rate and decay factor
   private double mu0 = 1;

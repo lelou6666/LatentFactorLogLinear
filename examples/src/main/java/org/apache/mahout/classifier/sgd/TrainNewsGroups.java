@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Reads and trains an adaptive logistic regression model on the 20 newsgroups data.
@@ -187,7 +186,7 @@ public final class TrainNewsGroups {
         averageCorrect = state.percentCorrect();
         averageLL = state.logLikelihood();
 
-        OnlineLogisticRegression model = state.getModels().get(0);
+        OnlineLogisticRegression model = (OnlineLogisticRegression) state.getModels().get(0);
         // finish off pending regularization
         model.close();
         

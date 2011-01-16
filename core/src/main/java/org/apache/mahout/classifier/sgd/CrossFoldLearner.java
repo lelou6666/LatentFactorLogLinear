@@ -293,7 +293,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
     PolymorphicWritable.write(out, auc);
     out.writeDouble(logLikelihood);
     out.writeInt(models.size());
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.write(out);
     }
 
