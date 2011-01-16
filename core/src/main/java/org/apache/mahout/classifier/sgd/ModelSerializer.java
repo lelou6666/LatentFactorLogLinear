@@ -51,7 +51,7 @@ public final class ModelSerializer {
     }
   }
 
-  public static void writeBinary(String path, AdaptiveLogisticRegression model) throws IOException {
+  public static void writeBinary(String path, AdjustableOnlineLearner model) throws IOException {
     PolymorphicWritable.write(new DataOutputStream(new FileOutputStream(path)), model);
   }
 

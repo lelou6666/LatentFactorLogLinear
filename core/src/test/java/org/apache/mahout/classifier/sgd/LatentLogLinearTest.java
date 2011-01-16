@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,11 @@
 
 package org.apache.mahout.classifier.sgd;
 
-import com.google.common.base.Predicates;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.math.DenseMatrix;
 import org.apache.mahout.math.Matrix;
-import org.apache.mahout.math.function.UnaryFunction;
+import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.stats.OnlineSummarizer;
 import org.junit.Test;
 
@@ -43,7 +40,7 @@ public class LatentLogLinearTest {
 
   private final Random rand = RandomUtils.getRandom();
 
-  private UnaryFunction generator = new UnaryFunction() {
+  private DoubleFunction generator = new DoubleFunction() {
     @Override
     public double apply(double arg1) {
       return rand.nextDouble() * 6 - 3;
