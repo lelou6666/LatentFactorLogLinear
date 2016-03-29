@@ -112,7 +112,7 @@
         <include>../README*</include>
         <include>../LICENSE*</include>
         <include>../NOTICE*</include>
-        <include>../KEYS</include>
+        <include>KEYS</include>
       </includes>
       <fileMode>0644</fileMode>
     </fileSet>
@@ -133,9 +133,18 @@
       <fileMode>0755</fileMode>
     </fileSet>
     <fileSet>
-      <directory>../conf</directory>
+      <directory>../src/conf</directory>
       <outputDirectory>conf</outputDirectory>
       <fileMode>0644</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>../examples/bin</directory>
+      <outputDirectory>examples/bin</outputDirectory>
+      <fileMode>0755</fileMode>
+      <excludes>
+        <exclude>work</exclude>
+        <exclude>work/**</exclude>
+      </excludes>
     </fileSet>
   </fileSets>
 </assembly>

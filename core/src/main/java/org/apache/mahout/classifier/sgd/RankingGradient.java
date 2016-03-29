@@ -17,7 +17,6 @@
 
 package org.apache.mahout.classifier.sgd;
 
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import org.apache.mahout.classifier.AbstractVectorClassifier;
 import org.apache.mahout.math.Vector;
@@ -36,7 +35,8 @@ import java.util.List;
  * goals.
  */
 public class RankingGradient implements Gradient {
-  private static final Gradient basic = new DefaultGradient();
+
+  private static final Gradient BASIC = new DefaultGradient();
 
   private int window = 10;
 
@@ -56,7 +56,7 @@ public class RankingGradient implements Gradient {
 
     Vector r = null;
     for (Vector other : otherSide) {
-      Vector g = basic.apply(groupKey, actual, instance.minus(other), classifier);
+      Vector g = BASIC.apply(groupKey, actual, instance.minus(other), classifier);
 
       if (r == null) {
         r = g;
@@ -80,6 +80,6 @@ public class RankingGradient implements Gradient {
   }
 
   public Gradient getBaseGradient() {
-    return basic;
+    return BASIC;
   }
 }

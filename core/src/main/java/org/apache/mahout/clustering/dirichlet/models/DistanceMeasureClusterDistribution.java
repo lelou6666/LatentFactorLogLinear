@@ -30,7 +30,7 @@ import org.apache.mahout.math.VectorWritable;
  */
 public class DistanceMeasureClusterDistribution extends AbstractVectorModelDistribution {
 
-  DistanceMeasure measure;
+  private DistanceMeasure measure;
 
   public DistanceMeasureClusterDistribution() {
   }
@@ -59,8 +59,7 @@ public class DistanceMeasureClusterDistribution extends AbstractVectorModelDistr
   public Model<VectorWritable>[] sampleFromPosterior(Model<VectorWritable>[] posterior) {
     Model<VectorWritable>[] result = new DistanceMeasureCluster[posterior.length];
     for (int i = 0; i < posterior.length; i++) {
-      DistanceMeasureCluster m = (DistanceMeasureCluster) posterior[i];
-      result[i] = m.sampleFromPosterior();
+      result[i] = posterior[i].sampleFromPosterior();
     }
     return result;
   }

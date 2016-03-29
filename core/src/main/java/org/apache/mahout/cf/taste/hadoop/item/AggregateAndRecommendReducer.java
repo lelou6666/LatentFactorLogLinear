@@ -29,11 +29,11 @@ import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.impl.recommender.ByValueRecommendedItemComparator;
 import org.apache.mahout.cf.taste.impl.recommender.GenericRecommendedItem;
 import org.apache.mahout.cf.taste.recommender.RecommendedItem;
-import org.apache.mahout.common.FileLineIterable;
+import org.apache.mahout.common.iterator.FileLineIterable;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.VarLongWritable;
 import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.function.UnaryFunction;
+import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.map.OpenIntLongHashMap;
 
 import java.io.IOException;
@@ -72,7 +72,7 @@ public final class AggregateAndRecommendReducer extends
   private static final float BOOLEAN_PREF_VALUE = 1.0f;
 
   @Override
-  protected void setup(Context context) {
+  protected void setup(Context context) throws IOException {
     Configuration jobConf = context.getConfiguration();
     recommendationsPerUser = jobConf.getInt(NUM_RECOMMENDATIONS, DEFAULT_NUM_RECOMMENDATIONS);
     booleanData = jobConf.getBoolean(RecommenderJob.BOOLEAN_DATA, false);
@@ -93,14 +93,12 @@ public final class AggregateAndRecommendReducer extends
           itemsToRecommendFor.add(Long.parseLong(line));
         }
       }
-    } catch (IOException ioe) {
-      throw new IllegalStateException(ioe);
     } finally {
       IOUtils.closeStream(in);
     }
   }
 
-  private static final UnaryFunction ABSOLUTE_VALUES = new UnaryFunction() {
+  private static final DoubleFunction ABSOLUTE_VALUES = new DoubleFunction() {
     @Override
     public double apply(double value) {
       return value < 0 ? value * -1 : value;
@@ -121,32 +119,16 @@ public final class AggregateAndRecommendReducer extends
   private void reduceBooleanData(VarLongWritable userID,
                                  Iterable<PrefAndSimilarityColumnWritable> values,
                                  Context context) throws IOException, InterruptedException {
-
     /* having boolean data, each estimated preference can only be 1,
-     * so the computation is much simpler */
+     * however we can't use this to rank the recommended items,
+     * so we use the sum of similarities for that. */
     Vector predictionVector = null;
     for (PrefAndSimilarityColumnWritable prefAndSimilarityColumn : values) {
       predictionVector = predictionVector == null
           ? prefAndSimilarityColumn.getSimilarityColumn()
           : predictionVector.plus(prefAndSimilarityColumn.getSimilarityColumn());
     }
-
-    Iterator<Vector.Element> predictions = predictionVector.iterateNonZero();
-    List<RecommendedItem> recommendations = new ArrayList<RecommendedItem>();
-    while (predictions.hasNext() && recommendations.size() < recommendationsPerUser) {
-      Vector.Element prediction = predictions.next();
-      /* NaN means the user already knows this item */
-      if (!Double.isNaN(prediction.get())) {
-        long itemID = indexItemIDMap.get(prediction.index());
-        if (itemsToRecommendFor == null || itemsToRecommendFor.contains(itemID)) {
-          recommendations.add(new GenericRecommendedItem(itemID, BOOLEAN_PREF_VALUE));
-        }
-      }
-    }
-
-    if (!recommendations.isEmpty()) {
-      context.write(userID, new RecommendedItemsWritable(recommendations));
-    }
+    writeRecommendedItems(userID, predictionVector, context);
   }
 
   private void reduceNonBooleanData(VarLongWritable userID,
@@ -193,9 +175,17 @@ public final class AggregateAndRecommendReducer extends
         recommendationVector.setQuick(itemIDIndex, prediction);
       }
     }
+    writeRecommendedItems(userID, recommendationVector, context);
+  }
 
-    Queue<RecommendedItem> topItems = new PriorityQueue<RecommendedItem>(recommendationsPerUser + 1,
-    Collections.reverseOrder(ByValueRecommendedItemComparator.getInstance()));
+  /**
+   * find the top entries in recommendationVector, map them to the real itemIDs and write back the result
+   */
+  private void writeRecommendedItems(VarLongWritable userID, Vector recommendationVector, Context context)
+    throws IOException, InterruptedException {
+    Queue<RecommendedItem> topItems =
+        new PriorityQueue<RecommendedItem>(recommendationsPerUser + 1,
+                                           Collections.reverseOrder(ByValueRecommendedItemComparator.getInstance()));
 
     Iterator<Vector.Element> recommendationVectorIterator = recommendationVector.iterateNonZero();
     while (recommendationVectorIterator.hasNext()) {

@@ -24,7 +24,7 @@ import com.google.common.collect.Multiset;
 import org.apache.mahout.math.Vector;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 import java.util.regex.Pattern;
 
 /**
@@ -34,9 +34,10 @@ import java.util.regex.Pattern;
  * @see LuceneTextValueEncoder
  */
 public class TextValueEncoder extends FeatureVectorEncoder {
-  private final Splitter onNonWord = Splitter.on(Pattern.compile("\\W+")).omitEmptyStrings();
+
   private static final double LOG_2 = Math.log(2);
 
+  private final Splitter onNonWord = Splitter.on(Pattern.compile("\\W+")).omitEmptyStrings();
   private FeatureVectorEncoder wordEncoder;
   private final Multiset<String> counts;
 
@@ -64,8 +65,7 @@ public class TextValueEncoder extends FeatureVectorEncoder {
    * @param originalForm  The original text encoded as UTF-8
    */
   public void addText(byte[] originalForm) {
-    String text = new String(originalForm, Charsets.UTF_8);
-    addText(text);
+    addText(new String(originalForm, Charsets.UTF_8));
   }
 
   /**
@@ -73,7 +73,7 @@ public class TextValueEncoder extends FeatureVectorEncoder {
    * form until flush is called.
    * @param text  The original text encoded as UTF-8
    */
-  public void addText(String text) {
+  public void addText(CharSequence text) {
     for (String word : tokenize(text)) {
       counts.add(word);
     }
@@ -98,9 +98,9 @@ public class TextValueEncoder extends FeatureVectorEncoder {
   }
 
   @Override
-  protected Iterable<Integer> hashesForProbe(byte[] originalForm, int dataSize, String name, int probe){
-    List<Integer> hashes = new ArrayList<Integer>();
-    for (String word : tokenize(new String(originalForm, Charsets.UTF_8))){
+  protected Iterable<Integer> hashesForProbe(byte[] originalForm, int dataSize, String name, int probe) {
+    Collection<Integer> hashes = new ArrayList<Integer>();
+    for (String word : tokenize(new String(originalForm, Charsets.UTF_8))) {
       hashes.add(hashForProbe(bytesForString(word), dataSize, name, probe));
     }
     return hashes;

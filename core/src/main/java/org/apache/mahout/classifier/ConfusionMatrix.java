@@ -18,11 +18,11 @@
 package org.apache.mahout.classifier;
 
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.mahout.common.Summarizable;
 
 import com.google.common.base.Preconditions;
 
@@ -31,18 +31,13 @@ import com.google.common.base.Preconditions;
  * 
  * See http://en.wikipedia.org/wiki/Confusion_matrix for background
  */
-public class ConfusionMatrix implements Summarizable {
-  
-  private final Collection<String> labels;
-  
-  private final Map<String,Integer> labelMap = new HashMap<String,Integer>();
-  
+public class ConfusionMatrix {
+
+  private final Map<String,Integer> labelMap = new LinkedHashMap<String,Integer>();
   private final int[][] confusionMatrix;
-  
   private String defaultLabel = "unknown";
   
   public ConfusionMatrix(Collection<String> labels, String defaultLabel) {
-    this.labels = labels;
     confusionMatrix = new int[labels.size() + 1][labels.size() + 1];
     this.defaultLabel = defaultLabel;
     for (String label : labels) {
@@ -56,14 +51,14 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   public Collection<String> getLabels() {
-    return labels;
+    return Collections.unmodifiableCollection(labelMap.keySet());
   }
   
   public double getAccuracy(String label) {
     int labelId = labelMap.get(label);
     int labelTotal = 0;
     int correct = 0;
-    for (int i = 0; i < labels.size(); i++) {
+    for (int i = 0; i < labelMap.size(); i++) {
       labelTotal += confusionMatrix[labelId][i];
       if (i == labelId) {
         correct = confusionMatrix[labelId][i];
@@ -80,7 +75,7 @@ public class ConfusionMatrix implements Summarizable {
   public double getTotal(String label) {
     int labelId = labelMap.get(label);
     int labelTotal = 0;
-    for (int i = 0; i < labels.size(); i++) {
+    for (int i = 0; i < labelMap.size(); i++) {
       labelTotal += confusionMatrix[labelId][i];
     }
     return labelTotal;
@@ -95,20 +90,20 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   public int getCount(String correctLabel, String classifiedLabel) {
-    Preconditions.checkArgument(!labels.contains(correctLabel)
-        || labels.contains(classifiedLabel)
-        || defaultLabel.equals(classifiedLabel),
-        "Label not found " + correctLabel + ' ' + classifiedLabel);
+    Preconditions.checkArgument(labelMap.containsKey(correctLabel),
+                                "Label not found: " + correctLabel);
+    Preconditions.checkArgument(labelMap.containsKey(classifiedLabel),
+                                "Label not found: " + classifiedLabel);
     int correctId = labelMap.get(correctLabel);
     int classifiedId = labelMap.get(classifiedLabel);
     return confusionMatrix[correctId][classifiedId];
   }
   
   public void putCount(String correctLabel, String classifiedLabel, int count) {
-    Preconditions.checkArgument(!labels.contains(correctLabel)
-        || labels.contains(classifiedLabel)
-        || defaultLabel.equals(classifiedLabel),
-        "Label not found " + correctLabel + ' ' + classifiedLabel);
+    Preconditions.checkArgument(labelMap.containsKey(correctLabel),
+                                "Label not found: " + correctLabel);
+    Preconditions.checkArgument(labelMap.containsKey(classifiedLabel),
+                                "Label not found: " + classifiedLabel);
     int correctId = labelMap.get(correctLabel);
     int classifiedId = labelMap.get(classifiedLabel);
     confusionMatrix[correctId][classifiedId] = count;
@@ -123,9 +118,9 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   public ConfusionMatrix merge(ConfusionMatrix b) {
-    Preconditions.checkArgument(labels.size() == b.getLabels().size(), "The label sizes do not match");
-    for (String correctLabel : this.labels) {
-      for (String classifiedLabel : this.labels) {
+    Preconditions.checkArgument(labelMap.size() == b.getLabels().size(), "The label sizes do not match");
+    for (String correctLabel : this.labelMap.keySet()) {
+      for (String classifiedLabel : this.labelMap.keySet()) {
         incrementCount(correctLabel, classifiedLabel, b.getCount(correctLabel, classifiedLabel));
       }
     }
@@ -133,28 +128,28 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   @Override
-  public String summarize() {
+  public String toString() {
     StringBuilder returnString = new StringBuilder(200);
     returnString.append("=======================================================").append('\n');
     returnString.append("Confusion Matrix\n");
     returnString.append("-------------------------------------------------------").append('\n');
     
-    for (String correctLabel : this.labels) {
-      returnString.append(StringUtils.rightPad(getSmallLabel(labelMap.get(correctLabel)), 5))
-          .append('\t');
+    for (Map.Entry<String,Integer> entry : this.labelMap.entrySet()) {
+      returnString.append(StringUtils.rightPad(getSmallLabel(entry.getValue()), 5)).append('\t');
     }
     
     returnString.append("<--Classified as").append('\n');
     
-    for (String correctLabel : this.labels) {
+    for (Map.Entry<String,Integer> entry : this.labelMap.entrySet()) {
+      String correctLabel = entry.getKey();
       int labelTotal = 0;
-      for (String classifiedLabel : this.labels) {
+      for (String classifiedLabel : this.labelMap.keySet()) {
         returnString.append(
           StringUtils.rightPad(Integer.toString(getCount(correctLabel, classifiedLabel)), 5)).append('\t');
         labelTotal += getCount(correctLabel, classifiedLabel);
       }
       returnString.append(" |  ").append(StringUtils.rightPad(String.valueOf(labelTotal), 6)).append('\t')
-          .append(StringUtils.rightPad(getSmallLabel(labelMap.get(correctLabel)), 5))
+          .append(StringUtils.rightPad(getSmallLabel(entry.getValue()), 5))
           .append(" = ").append(correctLabel).append('\n');
     }
     returnString.append("Default Category: ").append(defaultLabel).append(": ").append(

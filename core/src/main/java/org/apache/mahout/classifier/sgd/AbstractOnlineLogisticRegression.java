@@ -17,15 +17,15 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import org.apache.mahout.classifier.AbstractVectorClassifier;
 import org.apache.mahout.classifier.OnlineLearner;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.function.Functions;
-import org.apache.mahout.math.function.UnaryFunction;
-
-import com.google.common.base.Preconditions;
+import org.apache.mahout.math.function.DoubleFunction;
 
 import java.util.Iterator;
 
@@ -46,7 +46,7 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
   // number of categories we are classifying.  This should the number of rows of beta plus one.
   protected int numCategories;
 
-  private int step = 0;
+  protected int step;
 
   // information about how long since coefficient rows were updated.  This allows lazy regularization.
   protected Vector updateSteps;
@@ -60,7 +60,7 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
   protected PriorFunction prior;
 
   // can we ignore any further regularization when doing classification?
-  private boolean sealed = false;
+  private boolean sealed;
 
   // by default we don't do any fancy training
   private Gradient gradient = new DefaultGradient();
@@ -101,13 +101,13 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
    * @param r  The value to transform.
    * @return   The logit of r.
    */
-  public double link(double r){
-    if (r < 0) {
+  public double link(double r) {
+    if (r < 0.0) {
       double s = Math.exp(r);
-      return s / (1 + s);
+      return s / (1.0 + s);
     } else {
       double s = Math.exp(-r);
-      return 1 / (1 + s);
+      return 1.0 / (1.0 + s);
     }
   }
 
@@ -175,6 +175,9 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
         int j = updateLocation.index();
 
         double newValue = beta.getQuick(i, j) + gradientBase * learningRate * perTermLearningRate(j) * instance.get(j);
+        if (Double.isNaN(newValue) || Double.isInfinite(newValue)) {
+          throw new ArithmeticException(String.format("Updating from %.3f to nastiness\n", beta.getQuick(i, j)));
+        }
         beta.setQuick(i, j, newValue);
       }
     }
@@ -297,9 +300,13 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
     }
   }
 
-  public void copyFrom(AbstractOnlineLogisticRegression other) {
+  public void copyFrom(AdjustableOnlineLearner otherLearner) {
+    Preconditions.checkArgument(otherLearner instanceof OnlineLogisticRegression);
+    AbstractOnlineLogisticRegression other = (AbstractOnlineLogisticRegression) otherLearner;
+      
     // number of categories we are classifying.  This should the number of rows of beta plus one.
-    Preconditions.checkArgument(numCategories == other.numCategories, "Can't copy unless number of target categories is the same");
+    Preconditions.checkArgument(numCategories == other.numCategories,
+                                "Can't copy unless number of target categories is the same");
 
     beta.assign(other.beta);
 
@@ -310,7 +317,7 @@ public abstract class AbstractOnlineLogisticRegression extends AbstractVectorCla
   }
 
   public boolean validModel() {
-    double k = beta.aggregate(Functions.PLUS, new UnaryFunction() {
+    double k = beta.aggregate(Functions.PLUS, new DoubleFunction() {
       @Override
       public double apply(double v) {
         return Double.isNaN(v) || Double.isInfinite(v) ? 1 : 0;

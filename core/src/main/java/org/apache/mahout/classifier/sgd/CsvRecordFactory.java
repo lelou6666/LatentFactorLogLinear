@@ -72,7 +72,7 @@ public class CsvRecordFactory implements RecordFactory {
   // commas inside.  Also, escaped quotes will not be unescaped.  Good enough for now.
   private final Splitter onComma = Splitter.on(",").trimResults(CharMatcher.is('"'));
 
-  private static final Map<String, Class<? extends FeatureVectorEncoder>> typeDictionary =
+  private static final Map<String, Class<? extends FeatureVectorEncoder>> TYPE_DICTIONARY =
           ImmutableMap.<String, Class<? extends FeatureVectorEncoder>>builder()
                   .put("continuous", ContinuousValueEncoder.class)
                   .put("numeric", ContinuousValueEncoder.class)
@@ -95,7 +95,8 @@ public class CsvRecordFactory implements RecordFactory {
   private final Map<String, String> typeMap;
   private List<String> variableNames;
   private boolean includeBiasTerm;
-  private static final String CANNOT_CONSTRUCT_CONVERTER = "Unable to construct type converter... shouldn't be possible";
+  private static final String CANNOT_CONSTRUCT_CONVERTER =
+      "Unable to construct type converter... shouldn't be possible";
 
   /**
    * Construct a parser for CSV lines that encodes the parsed data in vector form.
@@ -116,9 +117,10 @@ public class CsvRecordFactory implements RecordFactory {
    */
   @Override
   public void defineTargetCategories(List<String> values) {
-    Preconditions.checkArgument(values.size() <= maxTargetValue,
-      "Must have less than or equal to " + maxTargetValue +
-        " categories for target variable, but found " + values.size());
+    Preconditions.checkArgument(
+        values.size() <= maxTargetValue,
+        "Must have less than or equal to " + maxTargetValue + " categories for target variable, but found "
+            + values.size());
     if (maxTargetValue == Integer.MAX_VALUE) {
       maxTargetValue = values.size();
     }
@@ -189,11 +191,11 @@ public class CsvRecordFactory implements RecordFactory {
         c = ConstantValueEncoder.class;
       } else {
         name = variableNames.get(predictor);
-        c = typeDictionary.get(typeMap.get(name));
+        c = TYPE_DICTIONARY.get(typeMap.get(name));
       }
       try {
         Preconditions.checkArgument(c != null, "Invalid type of variable %s,  wanted one of %s",
-          typeMap.get(name), typeDictionary.keySet());
+          typeMap.get(name), TYPE_DICTIONARY.keySet());
         Constructor<? extends FeatureVectorEncoder> constructor = c.getConstructor(String.class);
         Preconditions.checkArgument(constructor != null, "Can't find correct constructor for %s", typeMap.get(name));
         FeatureVectorEncoder encoder = constructor.newInstance(name);

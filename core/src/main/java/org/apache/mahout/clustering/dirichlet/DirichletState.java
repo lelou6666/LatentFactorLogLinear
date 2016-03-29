@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.clustering.Model;
 import org.apache.mahout.clustering.ModelDistribution;
+import org.apache.mahout.clustering.dirichlet.models.DistributionDescription;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
@@ -37,8 +38,8 @@ public class DirichletState {
   
   private Vector mixture; // the mixture vector
   
-  private double alpha0; // alpha0
-  
+  private final double alpha0; // alpha0
+
   public DirichletState(ModelDistribution<VectorWritable> modelFactory,
                         int numClusters,
                         double alpha0) {
@@ -54,8 +55,12 @@ public class DirichletState {
     mixture = UncommonDistributions.rDirichlet(computeTotalCounts(), alpha0);
   }
   
-  public DirichletState() { }
-  
+  public DirichletState(DistributionDescription description,
+                        int numClusters,
+                        double alpha0) {
+    this(description.createModelDistribution(), numClusters, alpha0);
+  }
+
   public int getNumClusters() {
     return numClusters;
   }
@@ -104,7 +109,7 @@ public class DirichletState {
    * Update the receiver with the new models
    * 
    * @param newModels
-   *          a Model<Observation>[] of new models
+   *          a Model[] of new models
    */
   public void update(Cluster[] newModels) {
     // compute new model parameters based upon observations and update models
@@ -131,7 +136,6 @@ public class DirichletState {
     return mix * pdf;
   }
   
-  @SuppressWarnings("unchecked")
   public Model<VectorWritable>[] getModels() {
     Model<VectorWritable>[] result = new Model[numClusters];
     for (int i = 0; i < numClusters; i++) {

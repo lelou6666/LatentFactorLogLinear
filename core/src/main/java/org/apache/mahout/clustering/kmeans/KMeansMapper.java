@@ -19,7 +19,6 @@ package org.apache.mahout.clustering.kmeans;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -34,7 +33,7 @@ public class KMeansMapper extends Mapper<WritableComparable<?>, VectorWritable, 
 
   private KMeansClusterer clusterer;
 
-  private final List<Cluster> clusters = new ArrayList<Cluster>();
+  private final Collection<Cluster> clusters = new ArrayList<Cluster>();
 
   @Override
   protected void map(WritableComparable<?> key, VectorWritable point, Context context)
@@ -56,7 +55,7 @@ public class KMeansMapper extends Mapper<WritableComparable<?>, VectorWritable, 
 
       String clusterPath = conf.get(KMeansConfigKeys.CLUSTER_PATH_KEY);
       if ((clusterPath != null) && (clusterPath.length() > 0)) {
-        KMeansUtil.configureWithClusterInfo(new Path(clusterPath), clusters);
+        KMeansUtil.configureWithClusterInfo(conf, new Path(clusterPath), clusters);
         if (clusters.isEmpty()) {
           throw new IllegalStateException("No clusters found. Check your -c path.");
         }

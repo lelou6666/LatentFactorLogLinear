@@ -23,92 +23,50 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import com.google.common.base.Function;
+import com.google.common.collect.ForwardingIterator;
+import com.google.common.collect.Iterators;
+import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.RandomUtils;
 
 /**
  * Sample a fixed number of elements from an Iterator. The results will appear in the original order at some
  * cost in time and memory relative to a FixedSizeSampler.
  */
-public class StableFixedSizeSamplingIterator<T> extends DelegatingIterator<T> {
+public class StableFixedSizeSamplingIterator<T> extends ForwardingIterator<T> {
+
+  private final Iterator<T> delegate;
   
   public StableFixedSizeSamplingIterator(int size, Iterator<T> source) {
-    super(buildDelegate(size, source));
-  }
-  
-  private static <T> Iterator<T> buildDelegate(int size, Iterator<T> source) {
-    List<Entry<T>> buf = new ArrayList<Entry<T>>(size);
+    List<Pair<Integer,T>> buf = new ArrayList<Pair<Integer,T>>(size);
     int sofar = 0;
+    Random random = RandomUtils.getRandom();
     while (source.hasNext()) {
       T v = source.next();
       sofar++;
       if (buf.size() < size) {
-        buf.add(new Entry<T>(sofar, v));
+        buf.add(new Pair<Integer,T>(sofar, v));
       } else {
-        Random generator = RandomUtils.getRandom();
-        int position = generator.nextInt(sofar);
+        int position = random.nextInt(sofar);
         if (position < buf.size()) {
-          buf.get(position).value = v;
+          buf.set(position, new Pair<Integer,T>(sofar, v));
         }
       }
     }
-    
+
     Collections.sort(buf);
-    return new DelegateIterator(buf);
+    delegate = Iterators.transform(buf.iterator(),
+                                   new Function<Pair<Integer,T>,T>() {
+                                     @Override
+                                     public T apply(Pair<Integer,T> from) {
+                                       return from.getSecond();
+                                     }
+                                   });
   }
-  
-  private static final class Entry<T> implements Comparable<Entry<T>> {
-    
-    private final int originalIndex;
-    private T value;
-    
-    private Entry(int originalIndex, T value) {
-      this.originalIndex = originalIndex;
-      this.value = value;
-    }
-    
-    @Override
-    public boolean equals(Object other) {
-      return other instanceof Entry<?> && originalIndex == ((Entry<?>) other).originalIndex;
-    }
-    
-    @Override
-    public int hashCode() {
-      return originalIndex;
-    }
-    
-    @Override
-    public int compareTo(Entry<T> other) {
-      if (originalIndex < other.originalIndex) {
-        return -1;
-      } else if (originalIndex > other.originalIndex) {
-        return 1;
-      } else {
-        return 0;
-      }
-    }
+
+  @Override
+  protected Iterator<T> delegate() {
+    return delegate;
   }
-  
-  private static final class DelegateIterator<T> implements Iterator<T> {
-    
-    private final Iterator<Entry<T>> iterator;
-    
-    private DelegateIterator(List<Entry<T>> buf) {
-      iterator = buf.iterator();
-    }
-    
-    @Override
-    public boolean hasNext() {
-      return iterator.hasNext();
-    }
-    
-    @Override
-    public T next() {
-      return iterator.next().value;
-    }
-    
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException("Can't change sampler contents");
-    }
-  }
+
 }

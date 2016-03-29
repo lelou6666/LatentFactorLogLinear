@@ -17,7 +17,9 @@
  limitations under the License.
 -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -27,14 +29,14 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <groupId>org.apache.mahout</groupId>
   <artifactId>mahout-examples</artifactId>
-  <version>0.5-SNAPSHOT</version>
   <name>Mahout Examples</name>
   <description>Scalable machine learning library examples</description>
 
   <packaging>jar</packaging>
-
+  <properties>
+    <mahout.skip.example>false</mahout.skip.example>
+  </properties>
   <build>
     <plugins>
       <plugin>
@@ -72,9 +74,9 @@
             <phase>package</phase>
             <configuration>
               <tasks>
-                <ant antfile="../etc/build.xml" target="build-grouplens-jar">
-                  <property name="dest" value="${project.build.directory}" />
-                  <property name="examples-base" value="src/main/java" />
+                <ant antfile="build.xml" target="build-grouplens-jar">
+                  <property name="dest" value="${project.build.directory}"/>
+                  <property name="examples-base" value="src/main/java"/>
                 </ant>
               </tasks>
 
@@ -98,6 +100,7 @@
               <goal>single</goal>
             </goals>
             <configuration>
+              <skipAssembly>${mahout.skip.example}</skipAssembly>
               <descriptors>
                 <descriptor>src/main/assembly/job.xml</descriptor>
               </descriptors>
@@ -120,33 +123,40 @@
           </supplementalModels>
         </configuration>
       </plugin>
+
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
     </plugins>
 
   </build>
 
   <dependencies>
-
+  
+    <!-- our modules -->
     <dependency>
-      <groupId>org.apache.mahout</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>mahout-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-math</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-math</artifactId>
-      <version>${project.version}</version>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-core</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.mahout</groupId>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-math</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-math</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
       <artifactId>mahout-utils</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
 
@@ -154,28 +164,17 @@
     <dependency>
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-wikipedia</artifactId>
-      <version>${lucene.version}</version>
     </dependency>
 
-    <!-- core test -->
-    <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-core</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
 
     <dependency>
       <groupId>org.uncommons.watchmaker</groupId>
       <artifactId>watchmaker-framework</artifactId>
-      <version>0.6.2</version>
     </dependency>
 
     <dependency>
       <groupId>org.uncommons.watchmaker</groupId>
       <artifactId>watchmaker-swing</artifactId>
-      <version>0.6.2</version>
       <exclusions>
         <exclusion>
           <groupId>jfree</groupId>
@@ -202,27 +201,26 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.6.0</version>
     </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-jcl</artifactId>
-      <version>1.6.0</version>
     </dependency>
 
     <dependency>
       <groupId>net.java.dev.jets3t</groupId>
       <artifactId>jets3t</artifactId>
-      <version>0.7.1</version>
     </dependency>
 
   </dependencies>
 
-
-  <scm>
-    <connection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/examples</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/examples </developerConnection>
-    <url>https://svn.apache.org/repos/asf/mahout/mahout-examples</url>
-  </scm>
+  <profiles>
+    <profile>
+      <id>release.prepare</id>
+      <properties>
+        <mahout.skip.example>true</mahout.skip.example>
+      </properties>
+    </profile>
+  </profiles>
 </project>

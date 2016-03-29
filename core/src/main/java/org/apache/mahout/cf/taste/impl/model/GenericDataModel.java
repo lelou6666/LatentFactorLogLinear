@@ -92,7 +92,7 @@ public final class GenericDataModel extends AbstractDataModel {
       for (Preference preference : prefs) {
         long itemID = preference.getItemID();
         itemIDSet.add(itemID);
-        List<Preference> prefsForItem = (List<Preference>) prefsForItems.get(itemID);
+        Collection<Preference> prefsForItem = prefsForItems.get(itemID);
         if (prefsForItem == null) {
           prefsForItem = new ArrayList<Preference>(2);
           prefsForItems.put(itemID, prefsForItem);
@@ -189,7 +189,14 @@ public final class GenericDataModel extends AbstractDataModel {
   public FastByIDMap<PreferenceArray> getRawUserData() {
     return this.preferenceFromUsers;
   }
-  
+
+  /**
+   * This is used mostly internally to the framework, and shouldn't be relied upon otherwise.
+   */
+  public FastByIDMap<PreferenceArray> getRawItemData() {
+    return this.preferenceForItems;
+  }
+
   @Override
   public LongPrimitiveArrayIterator getUserIDs() {
     return new LongPrimitiveArrayIterator(userIDs);
@@ -203,7 +210,7 @@ public final class GenericDataModel extends AbstractDataModel {
   public PreferenceArray getPreferencesFromUser(long userID) throws NoSuchUserException {
     PreferenceArray prefs = preferenceFromUsers.get(userID);
     if (prefs == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     return prefs;
   }
@@ -228,7 +235,7 @@ public final class GenericDataModel extends AbstractDataModel {
   public PreferenceArray getPreferencesForItem(long itemID) throws NoSuchItemException {
     PreferenceArray prefs = preferenceForItems.get(itemID);
     if (prefs == null) {
-      throw new NoSuchItemException();
+      throw new NoSuchItemException(itemID);
     }
     return prefs;
   }
@@ -252,7 +259,7 @@ public final class GenericDataModel extends AbstractDataModel {
     }
     FastByIDMap<Long> itemTimestamps = timestamps.get(userID);
     if (itemTimestamps == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     return itemTimestamps.get(itemID);
   }

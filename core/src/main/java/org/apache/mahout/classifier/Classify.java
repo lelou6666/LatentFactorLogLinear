@@ -18,11 +18,10 @@
 package org.apache.mahout.classifier;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.List;
 
+import com.google.common.io.Files;
 import org.apache.commons.cli2.CommandLine;
 import org.apache.commons.cli2.Group;
 import org.apache.commons.cli2.Option;
@@ -36,7 +35,6 @@ import org.apache.lucene.util.Version;
 import org.apache.mahout.classifier.bayes.algorithm.BayesAlgorithm;
 import org.apache.mahout.classifier.bayes.algorithm.CBayesAlgorithm;
 import org.apache.mahout.classifier.bayes.common.BayesParameters;
-import org.apache.mahout.classifier.bayes.datastore.HBaseBayesDatastore;
 import org.apache.mahout.classifier.bayes.datastore.InMemoryBayesDatastore;
 import org.apache.mahout.classifier.bayes.interfaces.Algorithm;
 import org.apache.mahout.classifier.bayes.interfaces.Datastore;
@@ -46,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Runs the Bayes classifier using the given model location(HDFS/HBASE)
+ * Runs the Bayes classifier using the given model location on HDFS
  * 
  */
 public final class Classify {
@@ -91,7 +89,7 @@ public final class Classify {
     
     Option dataSourceOpt = obuilder.withLongName("dataSource").withRequired(true).withArgument(
       abuilder.withName("dataSource").withMinimum(1).withMaximum(1).create()).withDescription(
-      "Location of model: hdfs|hbase").withShortName("source").create();
+      "Location of model: hdfs").withShortName("source").create();
     
     Group options = gbuilder.withName("Options").withOption(pathOpt).withOption(classifyOpt).withOption(
       encodingOpt).withOption(analyzerOpt).withOption(defaultCatOpt).withOption(gramSizeOpt).withOption(
@@ -107,10 +105,11 @@ public final class Classify {
       
     }
     
-    BayesParameters params = new BayesParameters(gramSize);
-    
+    BayesParameters params = new BayesParameters();
+    params.setGramSize(gramSize);
     String modelBasePath = (String) cmdLine.getValue(pathOpt);
-    
+    params.setBasePath(modelBasePath);
+
     log.info("Loading model from: {}", params.print());
     
     Algorithm algorithm;
@@ -128,19 +127,6 @@ public final class Classify {
         log.info("Using Complementary Bayes Classifier");
         algorithm = new CBayesAlgorithm();
         datastore = new InMemoryBayesDatastore(params);
-      } else {
-        throw new IllegalArgumentException("Unrecognized classifier type: " + classifierType);
-      }
-      
-    } else if ("hbase".equals(dataSource)) {
-      if ("bayes".equalsIgnoreCase(classifierType)) {
-        log.info("Using Bayes Classifier");
-        algorithm = new BayesAlgorithm();
-        datastore = new HBaseBayesDatastore(modelBasePath, params);
-      } else if ("cbayes".equalsIgnoreCase(classifierType)) {
-        log.info("Using Complementary Bayes Classifier");
-        algorithm = new CBayesAlgorithm();
-        datastore = new HBaseBayesDatastore(modelBasePath, params);
       } else {
         throw new IllegalArgumentException("Unrecognized classifier type: " + classifierType);
       }
@@ -169,8 +155,9 @@ public final class Classify {
     }
     
     log.info("Converting input document to proper format");
-    String[] document = BayesFileFormatter.readerToDocument(analyzer, new InputStreamReader(
-        new FileInputStream(docPath), Charset.forName(encoding)));
+
+    String[] document =
+        BayesFileFormatter.readerToDocument(analyzer,Files.newReader(docPath, Charset.forName(encoding)));
     StringBuilder line = new StringBuilder();
     for (String token : document) {
       line.append(token).append(' ');

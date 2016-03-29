@@ -19,26 +19,22 @@ package org.apache.mahout.clustering.cdbw;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
-import org.apache.mahout.clustering.AbstractCluster;
 import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.clustering.ClusteringTestUtils;
-import org.apache.mahout.clustering.ModelDistribution;
 import org.apache.mahout.clustering.TestClusterEvaluator;
 import org.apache.mahout.clustering.canopy.Canopy;
 import org.apache.mahout.clustering.canopy.CanopyDriver;
 import org.apache.mahout.clustering.dirichlet.DirichletDriver;
 import org.apache.mahout.clustering.dirichlet.UncommonDistributions;
+import org.apache.mahout.clustering.dirichlet.models.DistributionDescription;
 import org.apache.mahout.clustering.dirichlet.models.GaussianClusterDistribution;
 import org.apache.mahout.clustering.evaluation.RepresentativePointsDriver;
 import org.apache.mahout.clustering.fuzzykmeans.FuzzyKMeansDriver;
@@ -71,7 +67,7 @@ public final class TestCDbwEvaluator extends MahoutTestCase {
 
   private FileSystem fs;
 
-  private final List<VectorWritable> sampleData = new ArrayList<VectorWritable>();
+  private final Collection<VectorWritable> sampleData = new ArrayList<VectorWritable>();
 
   private List<VectorWritable> referenceData = new ArrayList<VectorWritable>();
 
@@ -91,29 +87,6 @@ public final class TestCDbwEvaluator extends MahoutTestCase {
     referenceData = TestKmeansClustering.getPointsWritable(REFERENCE);
     // generate larger test data set for the clustering tests to chew on
     generateSamples();
-  }
-
-  void printRepPoints(int numIterations) throws IOException {
-    for (int i = 0; i <= numIterations; i++) {
-      Path out = new Path(getTestTempDirPath("output"), "representativePoints-" + i);
-      System.out.println("Representative Points for iteration " + i);
-      Configuration conf = new Configuration();
-      FileSystem fs = FileSystem.get(conf);
-      for (FileStatus file : fs.listStatus(out)) {
-        if (!file.getPath().getName().startsWith(".")) {
-          SequenceFile.Reader reader = new SequenceFile.Reader(fs, file.getPath(), conf);
-          try {
-            Writable clusterId = new IntWritable(0);
-            VectorWritable point = new VectorWritable();
-            while (reader.next(clusterId, point)) {
-              System.out.println("\tC-" + clusterId + ": " + AbstractCluster.formatVector(point.get(), null));
-            }
-          } finally {
-            reader.close();
-          }
-        }
-      }
-    }
   }
 
   /**
@@ -153,7 +126,7 @@ public final class TestCDbwEvaluator extends MahoutTestCase {
    *          double standard deviation of the samples
    * @throws Exception 
    */
-  private void generateSamples(int num, double mx, double my, double sd) throws Exception {
+  private void generateSamples(int num, double mx, double my, double sd) {
     log.info("Generating {} samples m=[{}, {}] sd={}", new Object[] { num, mx, my, sd });
     for (int i = 0; i < num; i++) {
       sampleData.add(new VectorWritable(new DenseVector(new double[] { UncommonDistributions.rNorm(mx, sd),
@@ -161,7 +134,7 @@ public final class TestCDbwEvaluator extends MahoutTestCase {
     }
   }
 
-  private void generateSamples() throws Exception {
+  private void generateSamples() {
     generateSamples(500, 1, 1, 3);
     generateSamples(300, 1, 0, 0.5);
     generateSamples(300, 0, 2, 0.1);
@@ -364,8 +337,12 @@ public final class TestCDbwEvaluator extends MahoutTestCase {
   @Test
   public void testDirichlet() throws Exception {
     ClusteringTestUtils.writePointsToFile(sampleData, getTestTempFilePath("testdata/file1"), fs, conf);
-    ModelDistribution<VectorWritable> modelDistribution = new GaussianClusterDistribution(new VectorWritable(new DenseVector(2)));
-    DirichletDriver.run(testdata, output, modelDistribution, 15, 5, 1.0, true, true, 0, true);
+    DistributionDescription description =
+        new DistributionDescription(GaussianClusterDistribution.class.getName(),
+                                    DenseVector.class.getName(),
+                                    null,
+                                    2);
+    DirichletDriver.run(testdata, output, description, 15, 5, 1.0, true, true, 0, true);
     int numIterations = 10;
     Path clustersIn = new Path(output, "clusters-0");
     RepresentativePointsDriver.run(conf,

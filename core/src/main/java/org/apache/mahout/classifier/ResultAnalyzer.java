@@ -18,16 +18,15 @@
 package org.apache.mahout.classifier;
 
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Collection;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.mahout.common.Summarizable;
 
 /**
  * ResultAnalyzer captures the classification statistics and displays in a tabular manner
- * 
  */
-public class ResultAnalyzer implements Summarizable {
+public class ResultAnalyzer {
   
   private final ConfusionMatrix confusionMatrix;
   
@@ -71,11 +70,6 @@ public class ResultAnalyzer implements Summarizable {
   
   @Override
   public String toString() {
-    return "";
-  }
-  
-  @Override
-  public String summarize() {
     StringBuilder returnString = new StringBuilder();
     
     returnString.append("=======================================================\n");
@@ -84,7 +78,7 @@ public class ResultAnalyzer implements Summarizable {
     int totalClassified = correctlyClassified + incorrectlyClassified;
     double percentageCorrect = (double) 100 * correctlyClassified / totalClassified;
     double percentageIncorrect = (double) 100 * incorrectlyClassified / totalClassified;
-    DecimalFormat decimalFormatter = new DecimalFormat("0.####");
+    NumberFormat decimalFormatter = new DecimalFormat("0.####");
     
     returnString.append(StringUtils.rightPad("Correctly Classified Instances", 40)).append(": ").append(
       StringUtils.leftPad(Integer.toString(correctlyClassified), 10)).append('\t').append(
@@ -96,7 +90,7 @@ public class ResultAnalyzer implements Summarizable {
       StringUtils.leftPad(Integer.toString(totalClassified), 10)).append('\n');
     returnString.append('\n');
     
-    returnString.append(confusionMatrix.summarize());
+    returnString.append(confusionMatrix);
     
     return returnString.toString();
   }

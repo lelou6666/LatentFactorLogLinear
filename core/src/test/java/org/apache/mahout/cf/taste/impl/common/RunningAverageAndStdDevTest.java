@@ -18,21 +18,18 @@
 package org.apache.mahout.cf.taste.impl.common;
 
 import org.apache.mahout.cf.taste.impl.TasteTestCase;
+import org.apache.mahout.common.RandomUtils;
 import org.junit.Test;
+
+import java.util.Random;
 
 public final class RunningAverageAndStdDevTest extends TasteTestCase {
 
+  private static final double SMALL_EPSILON = 1.0;
+
   @Test
   public void testFull() {
-    doTestAverageAndStdDev(new FullRunningAverageAndStdDev());
-  }
-
-  @Test
-  public void testCompact() {
-    doTestAverageAndStdDev(new CompactRunningAverageAndStdDev());
-  }
-
-  private static void doTestAverageAndStdDev(RunningAverageAndStdDev average) {
+    RunningAverageAndStdDev average = new FullRunningAverageAndStdDev();
 
     assertEquals(0, average.getCount());
     assertTrue(Double.isNaN(average.getAverage()));
@@ -62,6 +59,19 @@ public final class RunningAverageAndStdDevTest extends TasteTestCase {
     assertEquals(1, average.getCount());
     assertEquals(-2.0, average.getAverage(), EPSILON);
     assertTrue(Double.isNaN(average.getStandardDeviation()));
+
+  }
+
+  @Test
+  public void testFullBig() {
+    RunningAverageAndStdDev average = new FullRunningAverageAndStdDev();
+
+    Random r = RandomUtils.getRandom();
+    for (int i = 0; i < 100000; i++) {
+      average.addDatum(r.nextDouble() * 1000.0);
+    }
+    assertEquals(500.0, average.getAverage(), SMALL_EPSILON);
+    assertEquals(1000.0 / Math.sqrt(12.0), average.getStandardDeviation(), SMALL_EPSILON);
 
   }
 

@@ -18,7 +18,6 @@
 package org.apache.mahout.cf.taste.example.netflix;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,7 +35,7 @@ import org.apache.mahout.cf.taste.impl.model.GenericPreference;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
-import org.apache.mahout.common.FileLineIterable;
+import org.apache.mahout.common.iterator.FileLineIterable;
 
 public final class NetflixFileDataModel implements DataModel {
   

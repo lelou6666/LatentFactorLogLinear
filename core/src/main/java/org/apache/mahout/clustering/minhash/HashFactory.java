@@ -21,7 +21,7 @@ import org.apache.mahout.vectorizer.encoders.MurmurHash;
 
 import java.util.Random;
 
-public class HashFactory {
+public final class HashFactory {
 
   private HashFactory() {
   }
@@ -32,7 +32,7 @@ public class HashFactory {
 
   public static HashFunction[] createHashFunctions(HashType type, int numFunctions) {
     HashFunction[] hashFunction = new HashFunction[numFunctions];
-    Random seed = new Random(11);
+    Random seed = RandomUtils.getRandom(11);
     switch (type) {
       case LINEAR:
         for (int i = 0; i < numFunctions; i++) {
@@ -49,6 +49,8 @@ public class HashFactory {
           hashFunction[i] = new MurmurHashWrapper(seed.nextInt());
         }
         break;
+      default:
+        throw new IllegalStateException("Unknown type: " + type);
     }
     return hashFunction;
   }
@@ -65,7 +67,7 @@ public class HashFactory {
     @Override
     public int hash(byte[] bytes) {
       long hashValue = 31;
-      for (byte byteVal : bytes) {
+      for (long byteVal : bytes) {
         hashValue *= seedA * byteVal;
         hashValue += seedB;
       }
@@ -87,7 +89,7 @@ public class HashFactory {
     @Override
     public int hash(byte[] bytes) {
       long hashValue = 31;
-      for (byte byteVal : bytes) {
+      for (long byteVal : bytes) {
         hashValue *= seedA * (byteVal >> 4);
         hashValue += seedB * byteVal + seedC;
       }
