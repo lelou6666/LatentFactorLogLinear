@@ -17,6 +17,7 @@
 
 package org.apache.mahout.cf.taste.impl.recommender.svd;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -29,6 +30,7 @@ import org.apache.mahout.cf.taste.impl.common.RefreshHelper;
 import org.apache.mahout.cf.taste.impl.recommender.AbstractRecommender;
 import org.apache.mahout.cf.taste.impl.recommender.TopItems;
 import org.apache.mahout.cf.taste.model.DataModel;
+import org.apache.mahout.cf.taste.model.PreferenceArray;
 import org.apache.mahout.cf.taste.recommender.CandidateItemsStrategy;
 import org.apache.mahout.cf.taste.recommender.IDRescorer;
 import org.apache.mahout.cf.taste.recommender.RecommendedItem;
@@ -42,34 +44,97 @@ import org.slf4j.LoggerFactory;
 public final class SVDRecommender extends AbstractRecommender {
 
   private Factorization factorization;
+  private final Factorizer factorizer;
+  private final PersistenceStrategy persistenceStrategy;
   private final RefreshHelper refreshHelper;
 
   private static final Logger log = LoggerFactory.getLogger(SVDRecommender.class);
 
   public SVDRecommender(DataModel dataModel, Factorizer factorizer) throws TasteException {
-    this(dataModel, factorizer, getDefaultCandidateItemsStrategy());
+    this(dataModel, factorizer, getDefaultCandidateItemsStrategy(), getDefaultPersistenceStrategy());
   }
 
   public SVDRecommender(DataModel dataModel, Factorizer factorizer, CandidateItemsStrategy candidateItemsStrategy)
-      throws TasteException {
+    throws TasteException {
+    this(dataModel, factorizer, candidateItemsStrategy, getDefaultPersistenceStrategy());
+  }
+
+  /**
+   * Create an SVDRecommender using a persistent store to cache factorizations. A factorization is loaded from the
+   * store if present, otherwise a new factorization is computed and saved in the store.
+   *
+   * The {@link #refresh(java.util.Collection) refresh} method recomputes the factorization and overwrites the store.
+   *
+   * @param dataModel
+   * @param factorizer
+   * @param persistenceStrategy
+   * @throws TasteException
+   * @throws IOException
+   */
+  public SVDRecommender(DataModel dataModel, Factorizer factorizer, PersistenceStrategy persistenceStrategy) 
+    throws TasteException {
+    this(dataModel, factorizer, getDefaultCandidateItemsStrategy(), persistenceStrategy);
+  }
+
+  /**
+   * Create an SVDRecommender using a persistent store to cache factorizations. A factorization is loaded from the
+   * store if present, otherwise a new factorization is computed and saved in the store. 
+   *
+   * The {@link #refresh(java.util.Collection) refresh} method recomputes the factorization and overwrites the store.
+   *
+   * @param dataModel
+   * @param factorizer
+   * @param candidateItemsStrategy
+   * @param persistenceStrategy
+   *
+   * @throws TasteException
+   */
+  public SVDRecommender(DataModel dataModel, Factorizer factorizer, CandidateItemsStrategy candidateItemsStrategy,
+      PersistenceStrategy persistenceStrategy) throws TasteException {
     super(dataModel, candidateItemsStrategy);
-    factorization = factorizer.factorize();
+    this.factorizer = Preconditions.checkNotNull(factorizer);
+    this.persistenceStrategy = Preconditions.checkNotNull(persistenceStrategy);
+    try {
+      factorization = persistenceStrategy.load();
+    } catch (IOException e) {
+      throw new TasteException("Error loading factorization", e);
+    }
+    
+    if (factorization == null) {
+      train();
+    }
+    
     refreshHelper = new RefreshHelper(new Callable<Object>() {
       @Override
       public Object call() throws TasteException {
-        // TODO: train again
+        train();
         return null;
       }
     });
     refreshHelper.addDependency(getDataModel());
+    refreshHelper.addDependency(factorizer);
   }
 
+  protected static PersistenceStrategy getDefaultPersistenceStrategy() {
+    return new NoPersistenceStrategy();
+  }
+
+  private void train() throws TasteException {
+    factorization = factorizer.factorize();
+    try {
+      persistenceStrategy.maybePersist(factorization);
+    } catch (IOException e) {
+      throw new TasteException("Error persisting factorization", e);
+    }
+  }
+  
   @Override
   public List<RecommendedItem> recommend(long userID, int howMany, IDRescorer rescorer) throws TasteException {
     Preconditions.checkArgument(howMany >= 1, "howMany must be at least 1");
     log.debug("Recommending items for user ID '{}'", userID);
 
-    FastIDSet possibleItemIDs = getAllOtherItems(userID);
+    PreferenceArray preferencesFromUser = getDataModel().getPreferencesFromUser(userID);
+    FastIDSet possibleItemIDs = getAllOtherItems(userID, preferencesFromUser);
 
     List<RecommendedItem> topItems = TopItems.getTopItems(howMany, possibleItemIDs.iterator(), rescorer,
         new Estimator(userID));
@@ -106,8 +171,12 @@ public final class SVDRecommender extends AbstractRecommender {
     }
   }
 
+  /**
+   * Refresh the data model and factorization.
+   */
   @Override
   public void refresh(Collection<Refreshable> alreadyRefreshed) {
     refreshHelper.refresh(alreadyRefreshed);
   }
+
 }

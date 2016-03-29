@@ -42,9 +42,9 @@ public final class AffinityMatrixInputJob {
    */
   public static void runJob(Path input, Path output, int rows, int cols)
     throws IOException, InterruptedException, ClassNotFoundException {
-    HadoopUtil.overwriteOutput(output);
-
     Configuration conf = new Configuration();
+    HadoopUtil.delete(conf, output);
+
     conf.setInt(EigencutsKeys.AFFINITY_DIMENSIONS, rows);
     Job job = new Job(conf, "AffinityMatrixInputJob: " + input + " -> M/R -> " + output);
 
@@ -71,10 +71,10 @@ public final class AffinityMatrixInputJob {
     throws IOException, InterruptedException, ClassNotFoundException {
     Path seqFiles = new Path(output, "seqfiles-" + (System.nanoTime() & 0xFF));
     runJob(input, seqFiles, dimensions, dimensions);
-    DistributedRowMatrix A = new DistributedRowMatrix(seqFiles, 
+    DistributedRowMatrix a = new DistributedRowMatrix(seqFiles,
         new Path(seqFiles, "seqtmp-" + (System.nanoTime() & 0xFF)), 
         dimensions, dimensions);
-    A.setConf(new Configuration());
-    return A;
+    a.setConf(new Configuration());
+    return a;
   }
 }

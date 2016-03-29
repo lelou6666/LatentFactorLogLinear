@@ -17,49 +17,19 @@
 
 package org.apache.mahout.classifier.sgd;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.InstanceCreator;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.reflect.TypeToken;
 import org.apache.hadoop.io.Writable;
-import org.apache.mahout.classifier.OnlineLearner;
-import org.apache.mahout.ep.EvolutionaryProcess;
-import org.apache.mahout.ep.Mapping;
-import org.apache.mahout.ep.State;
-import org.apache.mahout.math.DenseMatrix;
-import org.apache.mahout.math.DenseVector;
-import org.apache.mahout.math.Matrix;
-import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.stats.OnlineAuc;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.Writer;
-import java.lang.reflect.Type;
-import java.nio.charset.Charset;
-import java.util.List;
 
 /**
- * Provides the ability to store SGD model-related objects as JSON.
+ * Provides the ability to store SGD model-related objects as binary files.
  */
 public final class ModelSerializer {
+<<<<<<< HEAD
 
   // thread-local singleton json (de)serializer
   private static final ThreadLocal<Gson> GSON;
@@ -84,23 +54,22 @@ public final class ModelSerializer {
     };
   }
 
+=======
+>>>>>>> refs/remotes/tdunning/lll
   // static class ... don't instantiate
   private ModelSerializer() {
   }
 
-  public static Gson gson() {
-    return GSON.get();
-  }
-
-  public static void writeJson(String path, OnlineLearner model) throws IOException {
-    Writer out = new OutputStreamWriter(new FileOutputStream(new File(path)), Charset.forName("UTF-8"));
+  public static void writeBinary(String path, CrossFoldLearner model) throws IOException {
+    DataOutputStream out = new DataOutputStream(new FileOutputStream(path));
     try {
-      out.write(gson().toJson(model));
+      PolymorphicWritable.write(out, model);
     } finally {
       out.close();
     }
   }
 
+<<<<<<< HEAD
   /**
    * Reads a model in JSON format.
    *
@@ -396,22 +365,23 @@ public final class ModelSerializer {
       }
       r.add("population", v);
       return r;
+=======
+  public static void writeBinary(String path, AdjustableOnlineLearner model) throws IOException {
+    DataOutputStream out = new DataOutputStream(new FileOutputStream(path));
+    try {
+      PolymorphicWritable.write(out, model);
+    } finally {
+      out.close();
+>>>>>>> refs/remotes/tdunning/lll
     }
   }
 
-  public static double[] asArray(JsonObject v, String name) {
-    JsonArray x = v.get(name).getAsJsonArray();
-    double[] params = new double[x.size()];
-    int i = 0;
-    for (JsonElement element : x) {
-      params[i++] = element.getAsDouble();
+  public static <T extends Writable> T readBinary(InputStream in, Class<T> clazz) throws IOException {
+    DataInputStream dataIn = new DataInputStream(in);
+    try {
+      return PolymorphicWritable.read(dataIn, clazz);
+    } finally {
+      dataIn.close();
     }
-    return params;
-  }
-
-  public static void main(String[] args) throws FileNotFoundException {
-    loadJsonFrom(new InputStreamReader(new FileInputStream(new File("/tmp/news-group-1000.model")),
-                                       Charset.forName("UTF-8")),
-                 OnlineLogisticRegression.class);
   }
 }

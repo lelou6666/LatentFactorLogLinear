@@ -17,7 +17,6 @@
 
 package org.apache.mahout.clustering.cdbw;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -25,17 +24,16 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
 import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.clustering.GaussianAccumulator;
 import org.apache.mahout.clustering.OnlineGaussianAccumulator;
 import org.apache.mahout.clustering.evaluation.RepresentativePointsDriver;
 import org.apache.mahout.clustering.evaluation.RepresentativePointsMapper;
 import org.apache.mahout.common.distance.DistanceMeasure;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirValueIterable;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 import org.slf4j.Logger;
@@ -65,7 +63,9 @@ public class CDbwEvaluator {
    * @param measure
    *            an appropriate DistanceMeasure
    */
-  public CDbwEvaluator(Map<Integer, List<VectorWritable>> representativePoints, List<Cluster> clusters, DistanceMeasure measure) {
+  public CDbwEvaluator(Map<Integer, List<VectorWritable>> representativePoints,
+                       List<Cluster> clusters,
+                       DistanceMeasure measure) {
     this.representativePoints = representativePoints;
     this.clusters = clusters;
     this.measure = measure;
@@ -82,8 +82,8 @@ public class CDbwEvaluator {
    * @param clustersIn
    *            a String path to the input clusters directory
    */
-  public CDbwEvaluator(Configuration conf, Path clustersIn) throws ClassNotFoundException, InstantiationException,
-      IllegalAccessException, IOException {
+  public CDbwEvaluator(Configuration conf, Path clustersIn)
+    throws ClassNotFoundException, InstantiationException, IllegalAccessException {
     ClassLoader ccl = Thread.currentThread().getContextClassLoader();
     measure = ccl.loadClass(conf.get(RepresentativePointsDriver.DISTANCE_MEASURE_KEY)).asSubclass(DistanceMeasure.class)
         .newInstance();
@@ -101,23 +101,11 @@ public class CDbwEvaluator {
    *            a String pathname to the directory containing input cluster files
    * @return a List<Cluster> of the clusters
    */
-  private static List<Cluster> loadClusters(Configuration conf, Path clustersIn) throws InstantiationException,
-      IllegalAccessException, IOException {
+  private static List<Cluster> loadClusters(Configuration conf, Path clustersIn) {
     List<Cluster> clusters = new ArrayList<Cluster>();
-    FileSystem fs = clustersIn.getFileSystem(conf);
-    for (FileStatus part : fs.listStatus(clustersIn)) {
-      if (!part.getPath().getName().startsWith(".")) {
-        Path inPart = part.getPath();
-        SequenceFile.Reader reader = new SequenceFile.Reader(fs, inPart, conf);
-        Writable key = reader.getKeyClass().asSubclass(Writable.class).newInstance();
-        Writable value = reader.getValueClass().asSubclass(Writable.class).newInstance();
-        while (reader.next(key, value)) {
-          Cluster cluster = (Cluster) value;
-          clusters.add(cluster);
-          value = reader.getValueClass().asSubclass(Writable.class).newInstance();
-        }
-        reader.close();
-      }
+    for (Cluster value :
+         new SequenceFileDirValueIterable<Cluster>(clustersIn, PathType.LIST, PathFilters.logsCRCFilter(), conf)) {
+      clusters.add(value);
     }
     return clusters;
   }
@@ -168,7 +156,7 @@ public class CDbwEvaluator {
     for (Iterator<Cluster> it = clusters.iterator(); it.hasNext();) {
       Cluster cluster = it.next();
       if (invalidCluster(cluster)) {
-        log.info("Pruning cluster Id=" + cluster.getId());
+        log.info("Pruning cluster Id={}", cluster.getId());
         it.remove();
         representativePoints.remove(cluster.getId());
       }
@@ -246,7 +234,7 @@ public class CDbwEvaluator {
       for (VectorWritable pt : repPtsI) {
         // compute f(x, vIJ) (eqn 7)
         Vector repJ = pt.get();
-        double densityIJ = (measure.distance(cluster.getCenter(), repJ) <= stdev ? 1.0 : 0.0);
+        double densityIJ = measure.distance(cluster.getCenter(), repJ) <= stdev ? 1.0 : 0.0;
         // accumulate sumJ
         sumJ += densityIJ / stdev;
       }
@@ -334,16 +322,16 @@ public class CDbwEvaluator {
           density = minDistance * interDensity / stdSum;
         }
 
-        log.debug("minDistance[" + cI + ',' + cJ + "]=" + minDistance);
-        log.debug("stDev[" + cI + "]=" + stDevI);
-        log.debug("stDev[" + cJ + "]=" + stDevJ);
-        log.debug("interDensity[" + cI + ',' + cJ + "]=" + interDensity);
-        log.debug("density[" + cI + ',' + cJ + "]=" + density);
+        log.debug("minDistance[{},{}]={}", new Object[] {cI, cJ, minDistance});
+        log.debug("stDev[{}]={}", cI, stDevI);
+        log.debug("stDev[{}]={}", cJ, stDevJ);
+        log.debug("interDensity[{},{}]={}", new Object[] {cI, cJ, interDensity});
+        log.debug("density[{},{}]={}", new Object[] {cI, cJ, density});
 
         sum += density;
       }
     }
-    log.debug("interClusterDensity=" + sum);
+    log.debug("interClusterDensity={}", sum);
     return sum;
   }
 }

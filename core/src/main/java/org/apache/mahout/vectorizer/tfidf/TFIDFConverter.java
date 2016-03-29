@@ -25,7 +25,6 @@ import java.util.List;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
@@ -40,6 +39,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirIterable;
 import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.vectorizer.common.PartialVectorMerger;
 import org.apache.mahout.vectorizer.term.TermDocumentCountMapper;
@@ -148,7 +149,8 @@ public final class TFIDFConverter {
     Path wordCountPath = new Path(output, WORDCOUNT_OUTPUT_FOLDER);
 
     startDFCounting(input, wordCountPath, baseConf);
-    Pair<Long[], List<Path>> datasetFeatures = createDictionaryChunks(wordCountPath, output, baseConf, chunkSizeInMegabytes);
+    Pair<Long[], List<Path>> datasetFeatures =
+        createDictionaryChunks(wordCountPath, output, baseConf, chunkSizeInMegabytes);
 
     int partialVectorIndex = 0;
     List<Path> partialVectorPaths = new ArrayList<Path>();
@@ -169,7 +171,6 @@ public final class TFIDFConverter {
     }
 
     Configuration conf = new Configuration(baseConf);
-    FileSystem fs = FileSystem.get(partialVectorPaths.get(0).toUri(), conf);
 
     Path outputDir = new Path(output, DOCUMENT_VECTOR_OUTPUT_FOLDER);
     
@@ -182,7 +183,7 @@ public final class TFIDFConverter {
                                             sequentialAccessOutput,
                                             namedVector,
                                             numReducers);
-    HadoopUtil.deletePaths(partialVectorPaths, fs);
+    HadoopUtil.delete(conf, partialVectorPaths);
 
   }
 
@@ -195,13 +196,9 @@ public final class TFIDFConverter {
                                                                  Configuration baseConf,
                                                                  int chunkSizeInMegabytes) throws IOException {
     List<Path> chunkPaths = new ArrayList<Path>();
-
-    IntWritable key = new IntWritable();
-    LongWritable value = new LongWritable();
     Configuration conf = new Configuration(baseConf);
 
     FileSystem fs = FileSystem.get(featureCountPath.toUri(), conf);
-    FileStatus[] outputFiles = fs.globStatus(new Path(featureCountPath, OUTPUT_FILES_PATTERN));
 
     long chunkSizeLimit = chunkSizeInMegabytes * 1024L * 1024L;
     int chunkIndex = 0;
@@ -213,32 +210,37 @@ public final class TFIDFConverter {
     long currentChunkSize = 0;
     long featureCount = 0;
     long vectorCount = Long.MAX_VALUE;
-    for (FileStatus fileStatus : outputFiles) {
-      Path path = fileStatus.getPath();
-      SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
-      // key is feature value is count
-      while (reader.next(key, value)) {
-        if (currentChunkSize > chunkSizeLimit) {
-          freqWriter.close();
-          chunkIndex++;
+    Path filesPattern = new Path(featureCountPath, OUTPUT_FILES_PATTERN);
+    for (Pair<IntWritable,LongWritable> record
+         : new SequenceFileDirIterable<IntWritable,LongWritable>(filesPattern,
+                                                                 PathType.GLOB,
+                                                                 null,
+                                                                 null,
+                                                                 true,
+                                                                 conf)) {
 
-          chunkPath = new Path(dictionaryPathBase, FREQUENCY_FILE + chunkIndex);
-          chunkPaths.add(chunkPath);
+      if (currentChunkSize > chunkSizeLimit) {
+        freqWriter.close();
+        chunkIndex++;
 
-          freqWriter = new SequenceFile.Writer(fs, conf, chunkPath, IntWritable.class, LongWritable.class);
-          currentChunkSize = 0;
-        }
+        chunkPath = new Path(dictionaryPathBase, FREQUENCY_FILE + chunkIndex);
+        chunkPaths.add(chunkPath);
 
-        int fieldSize = SEQUENCEFILE_BYTE_OVERHEAD + Integer.SIZE / 8 + Long.SIZE / 8;
-        currentChunkSize += fieldSize;
-        if (key.get() >= 0) {
-          freqWriter.append(key, value);
-        } else if (key.get() == -1) {
-          vectorCount = value.get();
-        }
-        featureCount = Math.max(key.get(), featureCount);
-
+        freqWriter = new SequenceFile.Writer(fs, conf, chunkPath, IntWritable.class, LongWritable.class);
+        currentChunkSize = 0;
       }
+
+      int fieldSize = SEQUENCEFILE_BYTE_OVERHEAD + Integer.SIZE / 8 + Long.SIZE / 8;
+      currentChunkSize += fieldSize;
+      IntWritable key = record.getFirst();
+      LongWritable value = record.getSecond();
+      if (key.get() >= 0) {
+        freqWriter.append(key, value);
+      } else if (key.get() == -1) {
+        vectorCount = value.get();
+      }
+      featureCount = Math.max(key.get(), featureCount);
+
     }
     featureCount++;
     freqWriter.close();
@@ -309,7 +311,7 @@ public final class TFIDFConverter {
     job.setReducerClass(TFIDFPartialVectorReducer.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-    HadoopUtil.overwriteOutput(output);
+    HadoopUtil.delete(conf, output);
 
     job.waitForCompletion(true);
   }
@@ -327,7 +329,7 @@ public final class TFIDFConverter {
         + "org.apache.hadoop.io.serializer.WritableSerialization");
     
     Job job = new Job(conf);
-    job.setJobName("VectorTfIdf Document Frequency Count running over input: " + input.toString());
+    job.setJobName("VectorTfIdf Document Frequency Count running over input: " + input);
     job.setJarByClass(TFIDFConverter.class);
     
     job.setOutputKeyClass(IntWritable.class);
@@ -343,7 +345,7 @@ public final class TFIDFConverter {
     job.setReducerClass(TermDocumentCountReducer.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-    HadoopUtil.overwriteOutput(output);
+    HadoopUtil.delete(conf, output);
 
     job.waitForCompletion(true);
   }

@@ -18,12 +18,11 @@
 package org.apache.mahout.utils.vectors.lucene;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.nio.charset.Charset;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import org.apache.commons.cli2.CommandLine;
 import org.apache.commons.cli2.Group;
 import org.apache.commons.cli2.Option;
@@ -43,8 +42,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.mahout.common.CommandLineUtil;
 import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.utils.vectors.TermInfo;
-import org.apache.mahout.utils.vectors.io.JWriterTermInfoWriter;
-import org.apache.mahout.utils.vectors.io.JWriterVectorWriter;
+import org.apache.mahout.utils.vectors.io.DelimitedTermInfoWriter;
 import org.apache.mahout.utils.vectors.io.SequenceFileVectorWriter;
 import org.apache.mahout.utils.vectors.io.VectorWriter;
 import org.apache.mahout.vectorizer.TF;
@@ -103,12 +101,6 @@ public final class Driver {
       "The maximum number of vectors to output.  If not specified, then it will loop over all docs")
         .withShortName("m").create();
 
-    Option outWriterOpt = obuilder.withLongName("outputWriter").withRequired(false).withArgument(
-      abuilder.withName("outputWriter").withMinimum(1).withMaximum(1).create()).withDescription(
-      "The VectorWriter to use, either seq "
-          + "(SequenceFileVectorWriter - default) or file (Writes to a File using JSON format)")
-        .withShortName("e").create();
-
     Option minDFOpt = obuilder.withLongName("minDF").withRequired(false).withArgument(
       abuilder.withName("minDF").withMinimum(1).withMaximum(1).create()).withDescription(
       "The minimum document frequency.  Default is 1").withShortName("md").create();
@@ -123,7 +115,7 @@ public final class Driver {
 
     Group group = gbuilder.withName("Options").withOption(inputOpt).withOption(idFieldOpt).withOption(
       outputOpt).withOption(delimiterOpt).withOption(helpOpt).withOption(fieldOpt).withOption(maxOpt)
-        .withOption(dictOutOpt).withOption(powerOpt).withOption(outWriterOpt).withOption(maxDFPercentOpt)
+        .withOption(dictOutOpt).withOption(powerOpt).withOption(maxDFPercentOpt)
         .withOption(weightOpt).withOption(minDFOpt).create();
 
     try {
@@ -209,18 +201,7 @@ public final class Driver {
         String outFile = cmdLine.getValue(outputOpt).toString();
         log.info("Output File: {}", outFile);
 
-        VectorWriter vectorWriter;
-        if (cmdLine.hasOption(outWriterOpt)) {
-          String outWriter = cmdLine.getValue(outWriterOpt).toString();
-          if ("file".equals(outWriter)) {
-            Writer writer = new OutputStreamWriter(new FileOutputStream(new File(outFile)), Charset.forName("UTF8"));
-            vectorWriter = new JWriterVectorWriter(writer);
-          } else {
-            vectorWriter = getSeqFileWriter(outFile);
-          }
-        } else {
-          vectorWriter = getSeqFileWriter(outFile);
-        }
+        VectorWriter vectorWriter = getSeqFileWriter(outFile);
 
         long numDocs = vectorWriter.write(iterable, maxDocs);
         vectorWriter.close();
@@ -230,8 +211,8 @@ public final class Driver {
         
         File dictOutFile = new File(cmdLine.getValue(dictOutOpt).toString());
         log.info("Dictionary Output file: {}", dictOutFile);
-        Writer writer = new OutputStreamWriter(new FileOutputStream(dictOutFile), Charset.forName("UTF8"));
-        JWriterTermInfoWriter tiWriter = new JWriterTermInfoWriter(writer, delimiter, field);
+        Writer writer = Files.newWriter(dictOutFile, Charsets.UTF_8);
+        DelimitedTermInfoWriter tiWriter = new DelimitedTermInfoWriter(writer, delimiter, field);
         tiWriter.write(termInfo);
         tiWriter.close();
         writer.close();

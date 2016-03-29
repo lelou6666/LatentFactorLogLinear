@@ -32,7 +32,11 @@ import java.io.IOException;
  * Extends the basic on-line logistic regression learner with a specific set of learning
  * rate annealing schedules.
  */
+<<<<<<< HEAD
 public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression implements AdjustableOnlineLearner, Writable {
+=======
+public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression implements AdjustableOnlineLearner {
+>>>>>>> refs/remotes/tdunning/lll
   public static final int WRITABLE_VERSION = 1;
 
   // these next two control decayFactor^steps exponential type of annealing
@@ -49,7 +53,7 @@ public class OnlineLogisticRegression extends AbstractOnlineLogisticRegression i
   private int perTermAnnealingOffset = 20;
 
   public OnlineLogisticRegression() {
-    // private constructor available for Gson, but not normal use
+    // private constructor available for serialization, but not normal use
   }
 
   public OnlineLogisticRegression(int numCategories, int numFeatures, PriorFunction prior) {

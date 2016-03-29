@@ -20,6 +20,7 @@ package org.apache.mahout.cf.taste.impl.recommender.svd;
 import org.apache.mahout.cf.taste.impl.TasteTestCase;
 import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.model.DataModel;
+import org.apache.mahout.cf.taste.model.PreferenceArray;
 import org.apache.mahout.cf.taste.recommender.CandidateItemsStrategy;
 import org.apache.mahout.cf.taste.recommender.RecommendedItem;
 import org.easymock.classextension.EasyMock;
@@ -51,6 +52,7 @@ public class SVDRecommenderTest extends TasteTestCase {
   @Test
   public void recommend() throws Exception {
     DataModel dataModel = EasyMock.createMock(DataModel.class);
+    PreferenceArray preferencesFromUser = EasyMock.createMock(PreferenceArray.class);
     CandidateItemsStrategy candidateItemsStrategy = EasyMock.createMock(CandidateItemsStrategy.class);
     Factorizer factorizer = EasyMock.createMock(Factorizer.class);
     Factorization factorization = EasyMock.createMock(Factorization.class);
@@ -60,7 +62,9 @@ public class SVDRecommenderTest extends TasteTestCase {
     candidateItems.add(3L);
 
     EasyMock.expect(factorizer.factorize()).andReturn(factorization);
-    EasyMock.expect(candidateItemsStrategy.getCandidateItems(1L, dataModel)).andReturn(candidateItems);
+    EasyMock.expect(dataModel.getPreferencesFromUser(1L)).andReturn(preferencesFromUser);
+    EasyMock.expect(candidateItemsStrategy.getCandidateItems(1L, preferencesFromUser, dataModel))
+        .andReturn(candidateItems);
     EasyMock.expect(factorization.getUserFeatures(1L)).andReturn(new double[] { 0.4, 2 });
     EasyMock.expect(factorization.getItemFeatures(5L)).andReturn(new double[] { 1, 0.3 });
     EasyMock.expect(factorization.getUserFeatures(1L)).andReturn(new double[] { 0.4, 2 });
@@ -73,9 +77,9 @@ public class SVDRecommenderTest extends TasteTestCase {
     List<RecommendedItem> recommendedItems = svdRecommender.recommend(1L, 5);
     assertEquals(2, recommendedItems.size());
     assertEquals(3L, recommendedItems.get(0).getItemID());
-    assertEquals(2f, recommendedItems.get(0).getValue(), EPSILON);
+    assertEquals(2.0f, recommendedItems.get(0).getValue(), EPSILON);
     assertEquals(5L, recommendedItems.get(1).getItemID());
-    assertEquals(1f, recommendedItems.get(1).getValue(), EPSILON);
+    assertEquals(1.0f, recommendedItems.get(1).getValue(), EPSILON);
 
     EasyMock.verify(dataModel, candidateItemsStrategy, factorizer, factorization);
   }

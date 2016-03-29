@@ -20,10 +20,12 @@ package org.apache.mahout.cf.taste.impl.model;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Iterators;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
+import org.apache.mahout.common.iterator.CountingIterator;
 
 /**
  * <p>
@@ -51,7 +53,7 @@ public final class GenericItemPreferenceArray implements PreferenceArray {
     this.id = Long.MIN_VALUE; // as a sort of 'unspecified' value
   }
   
-  public GenericItemPreferenceArray(List<Preference> prefs) {
+  public GenericItemPreferenceArray(List<? extends Preference> prefs) {
     this(prefs.size());
     int size = prefs.size();
     long itemID = Long.MIN_VALUE;
@@ -241,7 +243,13 @@ public final class GenericItemPreferenceArray implements PreferenceArray {
   
   @Override
   public Iterator<Preference> iterator() {
-    return new PreferenceArrayIterator();
+    return Iterators.transform(new CountingIterator(length()),
+                               new Function<Integer, Preference>() {
+                                 @Override
+                                 public Preference apply(Integer from) {
+                                   return new PreferenceView(from);
+                                 }
+                               });
   }
 
   @Override
@@ -263,28 +271,6 @@ public final class GenericItemPreferenceArray implements PreferenceArray {
     }
     result.append("}]");
     return result.toString();
-  }
-  
-  private final class PreferenceArrayIterator implements Iterator<Preference> {
-    private int i;
-    
-    @Override
-    public boolean hasNext() {
-      return i < length();
-    }
-    
-    @Override
-    public Preference next() {
-      if (i >= length()) {
-        throw new NoSuchElementException();
-      }
-      return new PreferenceView(i++);
-    }
-    
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
   }
   
   private final class PreferenceView implements Preference {

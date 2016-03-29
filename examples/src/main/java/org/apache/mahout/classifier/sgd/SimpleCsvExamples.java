@@ -17,9 +17,12 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import com.google.common.io.Files;
+import org.apache.mahout.common.IOUtils;
 import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Vector;
@@ -29,14 +32,13 @@ import org.apache.mahout.vectorizer.encoders.ConstantValueEncoder;
 import org.apache.mahout.vectorizer.encoders.FeatureVectorEncoder;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Random;
 
@@ -55,7 +57,7 @@ import java.util.Random;
  * This doesn't demonstrate text encoding which is subject to somewhat different tricks.  The basic
  * idea of caching hash locations and byte level parsing still very much applies to text, however.
  */
-public class SimpleCsvExamples {
+public final class SimpleCsvExamples {
 
   public static final int SEPARATOR_CHAR = '\t';
   public static final String SEPARATOR = "\t";
@@ -78,24 +80,30 @@ public class SimpleCsvExamples {
     Vector v = new DenseVector(1000);
     if (args[0].equals("--generate")) {
       PrintWriter out = new PrintWriter(new File(args[2]));
-      int n = Integer.parseInt(args[1]);
-      for (int i = 0; i < n; i++) {
-        Line x = Line.generate();
-        out.println(x);
-      }
-      out.close();
-    } else if ("--parse".equals(args[0])) {
-      BufferedReader in = new BufferedReader(
-          new InputStreamReader(new FileInputStream(new File(args[1])), Charset.forName("UTF-8")));
-      String line = in.readLine();
-      while (line != null) {
-        v.assign(0);
-        Line x = new Line(line);
-        for (int i = 0; i < FIELDS; i++) {
-          s[i].add(x.getDouble(i));
-          encoder[i].addToVector(x.get(i), v);
+      try {
+        int n = Integer.parseInt(args[1]);
+        for (int i = 0; i < n; i++) {
+          Line x = Line.generate();
+          out.println(x);
         }
-        line = in.readLine();
+      } finally {
+        IOUtils.quietClose(out);
+      }
+    } else if ("--parse".equals(args[0])) {
+      BufferedReader in = Files.newReader(new File(args[1]), Charsets.UTF_8);
+      try {
+        String line = in.readLine();
+        while (line != null) {
+          v.assign(0);
+          Line x = new Line(line);
+          for (int i = 0; i < FIELDS; i++) {
+            s[i].add(x.getDouble(i));
+            encoder[i].addToVector(x.get(i), v);
+          }
+          line = in.readLine();
+        }
+      } finally {
+        IOUtils.quietClose(in);
       }
       String separator = "";
       for (int i = 0; i < FIELDS; i++) {
@@ -104,15 +112,19 @@ public class SimpleCsvExamples {
       }
     } else if ("--fast".equals(args[0])) {
       FastLineReader in = new FastLineReader(new FileInputStream(args[1]));
-      FastLine line = in.read();
-      while (line != null) {
-        v.assign(0);
-        for (int i = 0; i < FIELDS; i++) {
-          double z = line.getDouble(i);
-          s[i].add(z);
-          encoder[i].addToVector((byte[]) null, z, v);
+      try {
+        FastLine line = in.read();
+        while (line != null) {
+          v.assign(0);
+          for (int i = 0; i < FIELDS; i++) {
+            double z = line.getDouble(i);
+            s[i].add(z);
+            encoder[i].addToVector((byte[]) null, z, v);
+          }
+          line = in.read();
         }
-        line = in.read();
+      } finally {
+        IOUtils.quietClose(in);
       }
       String separator = "";
       for (int i = 0; i < FIELDS; i++) {
@@ -124,16 +136,16 @@ public class SimpleCsvExamples {
   }
 
 
-  private static class Line {
-    private static final Splitter onTabs = Splitter.on(SEPARATOR).trimResults();
-    public static final Joiner withCommas = Joiner.on(SEPARATOR);
+  private static final class Line {
+    private static final Splitter ON_TABS = Splitter.on(SEPARATOR).trimResults();
+    public static final Joiner WITH_COMMAS = Joiner.on(SEPARATOR);
 
     public static final Random rand = RandomUtils.getRandom();
 
     private final List<String> data;
 
     private Line(CharSequence line) {
-      data = Lists.newArrayList(onTabs.split(line));
+      data = Lists.newArrayList(ON_TABS.split(line));
     }
 
     private Line() {
@@ -171,7 +183,7 @@ public class SimpleCsvExamples {
 
     @Override
     public String toString() {
-      return withCommas.join(data);
+      return WITH_COMMAS.join(data);
     }
 
     public String get(int field) {
@@ -179,7 +191,7 @@ public class SimpleCsvExamples {
     }
   }
 
-  private static class FastLine {
+  private static final class FastLine {
 
     private final ByteBuffer base;
     private final IntArrayList start = new IntArrayList();
@@ -195,6 +207,7 @@ public class SimpleCsvExamples {
       int offset = buf.position();
       while (offset < buf.limit()) {
         int ch = buf.get();
+        offset = buf.position();
         switch (ch) {
           case '\n':
             r.length.add(offset - r.start.get(r.length.size()) - 1);
@@ -221,14 +234,15 @@ public class SimpleCsvExamples {
         default:
           double r = 0;
           for (int i = 0; i < size; i++) {
-            r = 10 * r + base.get(offset + i);
+            r = 10 * r + base.get(offset + i) - '0';
           }
           return r;
       }
     }
   }
 
-  private static class FastLineReader {
+  private static final
+  class FastLineReader implements Closeable {
     private final InputStream in;
     private final ByteBuffer buf = ByteBuffer.allocate(100000);
 
@@ -258,6 +272,11 @@ public class SimpleCsvExamples {
           buf.position(0);
         }
       }
+    }
+
+    @Override
+    public void close() throws IOException {
+      in.close();
     }
   }
 }

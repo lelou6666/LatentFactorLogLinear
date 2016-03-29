@@ -17,12 +17,14 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Ordering;
+import com.google.common.io.Files;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -42,12 +44,9 @@ import org.apache.mahout.vectorizer.encoders.StaticWordValueEncoder;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
@@ -277,8 +276,12 @@ public final class TrainNewsGroups {
     for (ModelDissector.Weight w : weights) {
       System.out.printf("%s\t%.1f\t%s\t%.1f\t%s\t%.1f\t%s\n",
         w.getFeature(), w.getWeight(), ngNames.get(w.getMaxImpact() + 1),
+<<<<<<< HEAD
         w.getWeight(1), ngNames.get(w.getCategory(1)),
         w.getWeight(2), ngNames.get(w.getCategory(2)));
+=======
+        w.getWeight(1), ngNames.get(w.getCategory(1)), w.getWeight(2), ngNames.get(w.getCategory(2)));
+>>>>>>> refs/remotes/tdunning/lll
     }
   }
 
@@ -286,8 +289,7 @@ public final class TrainNewsGroups {
     long date = (long) (1000 * (DATE_REFERENCE + actual * MONTH + 1 * WEEK * rand.nextDouble()));
     Multiset<String> words = ConcurrentHashMultiset.create();
 
-    BufferedReader reader =
-        new BufferedReader(new InputStreamReader(new FileInputStream(file), Charset.forName("UTF-8")));
+    BufferedReader reader = Files.newReader(file, Charsets.UTF_8);
     try {
       String line = reader.readLine();
       Reader dateString = new StringReader(DATE_FORMATS[leakType % 3].format(new Date(date)));
@@ -302,7 +304,7 @@ public final class TrainNewsGroups {
             countWords(analyzer, words, in);
           }
           line = reader.readLine();
-        } while (line.startsWith(" "));
+        } while (line != null && line.startsWith(" "));
       }
       if (leakType < 3) {
         countWords(analyzer, words, reader);

@@ -40,8 +40,8 @@ public abstract class AbstractVectorClassifier implements VectorClassifier {
    */
   @Override
   public Vector classifyNoLink(Vector features) {
-    throw new UnsupportedOperationException("Classifier " + this.getClass().getName() +
-      " doesn't support classification without a link");
+    throw new UnsupportedOperationException(
+        this.getClass().getName() + " doesn't support classification without a link");
   }
 
   // ------- From here on, we have convenience methods that provide an easier API to use.
@@ -76,7 +76,7 @@ public abstract class AbstractVectorClassifier implements VectorClassifier {
   @Override
   public Vector classifyFull(Vector r, Vector instance) {
     r.viewPart(1, numCategories() - 1).assign(classify(instance));
-    r.setQuick(0, 1 - r.zSum());
+    r.setQuick(0, 1.0 - r.zSum());
     return r;
   }
 
@@ -146,16 +146,16 @@ public abstract class AbstractVectorClassifier implements VectorClassifier {
     if (numCategories() == 2) {
       double p = classifyScalar(data);
       if (actual > 0) {
-        return Math.max(-100, Math.log(p));
+        return Math.max(-100.0, Math.log(p));
       } else {
-        return Math.max(-100, Math.log(1 - p));
+        return Math.max(-100.0, Math.log(1.0 - p));
       }
     } else {
       Vector p = classify(data);
       if (actual > 0) {
-        return Math.max(-100, Math.log(p.get(actual - 1)));
+        return Math.max(-100.0, Math.log(p.get(actual - 1)));
       } else {
-        return Math.max(-100, Math.log(1 - p.zSum()));
+        return Math.max(-100.0, Math.log(1.0 - p.zSum()));
       }
     }
   }

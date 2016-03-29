@@ -29,9 +29,7 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <groupId>org.apache.mahout</groupId>
   <artifactId>mahout-examples</artifactId>
-  <version>0.5-SNAPSHOT</version>
   <name>Mahout Examples</name>
   <description>Scalable machine learning library examples</description>
 
@@ -76,7 +74,7 @@
             <phase>package</phase>
             <configuration>
               <tasks>
-                <ant antfile="../etc/build.xml" target="build-grouplens-jar">
+                <ant antfile="build.xml" target="build-grouplens-jar">
                   <property name="dest" value="${project.build.directory}"/>
                   <property name="examples-base" value="src/main/java"/>
                 </ant>
@@ -134,28 +132,31 @@
   </build>
 
   <dependencies>
-
+  
+    <!-- our modules -->
     <dependency>
-      <groupId>org.apache.mahout</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>mahout-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-math</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-math</artifactId>
-      <version>${project.version}</version>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-core</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.mahout</groupId>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-math</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>mahout-math</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
       <artifactId>mahout-utils</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
 
@@ -163,28 +164,17 @@
     <dependency>
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-wikipedia</artifactId>
-      <version>${lucene.version}</version>
     </dependency>
 
-    <!-- core test -->
-    <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-core</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
 
     <dependency>
       <groupId>org.uncommons.watchmaker</groupId>
       <artifactId>watchmaker-framework</artifactId>
-      <version>0.6.2</version>
     </dependency>
 
     <dependency>
       <groupId>org.uncommons.watchmaker</groupId>
       <artifactId>watchmaker-swing</artifactId>
-      <version>0.6.2</version>
       <exclusions>
         <exclusion>
           <groupId>jfree</groupId>
@@ -211,19 +201,16 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.6.0</version>
     </dependency>
 
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-jcl</artifactId>
-      <version>1.6.0</version>
     </dependency>
 
     <dependency>
       <groupId>net.java.dev.jets3t</groupId>
       <artifactId>jets3t</artifactId>
-      <version>0.7.1</version>
     </dependency>
 
   </dependencies>
@@ -236,10 +223,4 @@
       </properties>
     </profile>
   </profiles>
-
-  <scm>
-    <connection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/examples</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/examples</developerConnection>
-    <url>https://svn.apache.org/repos/asf/mahout/trunk/examples</url>
-  </scm>
 </project>

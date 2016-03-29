@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -32,13 +31,12 @@ import java.util.Map.Entry;
 
 import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
+import org.apache.mahout.fpm.pfpgrowth.CountDescendingPairComparator;
 import org.apache.mahout.fpm.pfpgrowth.convertors.StatusUpdater;
 import org.apache.mahout.fpm.pfpgrowth.convertors.TopKPatternsOutputConverter;
 import org.apache.mahout.fpm.pfpgrowth.convertors.TransactionIterator;
@@ -50,27 +48,19 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of PFGrowth Algorithm with FP-Bonsai pruning
  *
- * Generic parameter A is the object type used as the cell items in a transaction list.
- *
- * @param <A>
- *          the type used
+ * @param <A> object type used as the cell items in a transaction list
  */
 public class FPGrowth<A extends Comparable<? super A>> {
 
   private static final Logger log = LoggerFactory.getLogger(FPGrowth.class);
 
-  public static List<Pair<String,TopKStringPatterns>> readFrequentPattern(FileSystem fs,
-    Configuration conf,
-    Path path) throws IOException {
-
+  public static List<Pair<String,TopKStringPatterns>> readFrequentPattern(Configuration conf, Path path) {
     List<Pair<String,TopKStringPatterns>> ret = new ArrayList<Pair<String,TopKStringPatterns>>();
-    Writable key = new Text();
-    TopKStringPatterns value = new TopKStringPatterns();
-    SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
     // key is feature value is count
-    while (reader.next(key, value)) {
-      ret.add(new Pair<String,TopKStringPatterns>(key.toString(),
-          new TopKStringPatterns(value.getPatterns())));
+    for (Pair<Writable,TopKStringPatterns> record
+         : new SequenceFileIterable<Writable,TopKStringPatterns>(path, true, conf)) {
+      ret.add(new Pair<String,TopKStringPatterns>(record.getFirst().toString(),
+                                                  new TopKStringPatterns(record.getSecond().getPatterns())));
     }
     return ret;
   }
@@ -85,17 +75,14 @@ public class FPGrowth<A extends Comparable<? super A>> {
    *          minSupport of the feature to be included
    * @return the List of features and their associated frequency as a Pair
    */
-  public final List<Pair<A,Long>> generateFList(Iterator<Pair<List<A>,Long>> transactions,
-    int minSupport) {
+  public final List<Pair<A,Long>> generateFList(Iterator<Pair<List<A>,Long>> transactions, int minSupport) {
 
     Map<A,MutableLong> attributeSupport = new HashMap<A,MutableLong>();
-    // int count = 0;
     while (transactions.hasNext()) {
       Pair<List<A>,Long> transaction = transactions.next();
       for (A attribute : transaction.getFirst()) {
         if (attributeSupport.containsKey(attribute)) {
           attributeSupport.get(attribute).add(transaction.getSecond().longValue());
-          // count++;
         } else {
           attributeSupport.put(attribute, new MutableLong(transaction.getSecond()));
         }
@@ -109,18 +96,7 @@ public class FPGrowth<A extends Comparable<? super A>> {
       }
     }
 
-    Collections.sort(fList, new Comparator<Pair<A,Long>>() {
-
-      @Override
-      public int compare(Pair<A,Long> o1, Pair<A,Long> o2) {
-        int ret = o2.getSecond().compareTo(o1.getSecond());
-        if (ret != 0) {
-          return ret;
-        }
-        return o1.getFirst().compareTo(o2.getFirst());
-      }
-
-    });
+    Collections.sort(fList, new CountDescendingPairComparator<A,Long>());
 
     return fList;
   }
@@ -650,6 +626,7 @@ public class FPGrowth<A extends Comparable<? super A>> {
           int prevNodeId = prevNode.get(parent);
           if (tree.childCount(prevNodeId) <= 1 && tree.childCount(nextNode) <= 1) {
             tree.addCount(prevNodeId, tree.count(nextNode));
+            tree.addCount(nextNode, -1 * tree.count(nextNode));
             if (tree.childCount(nextNode) == 1) {
               tree.addChild(prevNodeId, tree.childAtIndex(nextNode, 0));
               tree.setParent(tree.childAtIndex(nextNode, 0), prevNodeId);

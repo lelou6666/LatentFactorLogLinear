@@ -19,12 +19,10 @@ package org.apache.mahout.classifier;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.mahout.common.Summarizable;
 
 import com.google.common.base.Preconditions;
 
@@ -33,7 +31,7 @@ import com.google.common.base.Preconditions;
  * 
  * See http://en.wikipedia.org/wiki/Confusion_matrix for background
  */
-public class ConfusionMatrix implements Summarizable {
+public class ConfusionMatrix {
 
   private final Map<String,Integer> labelMap = new LinkedHashMap<String,Integer>();
   private final int[][] confusionMatrix;
@@ -92,20 +90,20 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   public int getCount(String correctLabel, String classifiedLabel) {
-    Preconditions.checkArgument(!labelMap.containsKey(correctLabel)
-        || labelMap.containsKey(classifiedLabel)
-        || defaultLabel.equals(classifiedLabel),
-        "Label not found " + correctLabel + ' ' + classifiedLabel);
+    Preconditions.checkArgument(labelMap.containsKey(correctLabel),
+                                "Label not found: " + correctLabel);
+    Preconditions.checkArgument(labelMap.containsKey(classifiedLabel),
+                                "Label not found: " + classifiedLabel);
     int correctId = labelMap.get(correctLabel);
     int classifiedId = labelMap.get(classifiedLabel);
     return confusionMatrix[correctId][classifiedId];
   }
   
   public void putCount(String correctLabel, String classifiedLabel, int count) {
-    Preconditions.checkArgument(!labelMap.containsKey(correctLabel)
-        || labelMap.containsKey(classifiedLabel)
-        || defaultLabel.equals(classifiedLabel),
-        "Label not found " + correctLabel + ' ' + classifiedLabel);
+    Preconditions.checkArgument(labelMap.containsKey(correctLabel),
+                                "Label not found: " + correctLabel);
+    Preconditions.checkArgument(labelMap.containsKey(classifiedLabel),
+                                "Label not found: " + classifiedLabel);
     int correctId = labelMap.get(correctLabel);
     int classifiedId = labelMap.get(classifiedLabel);
     confusionMatrix[correctId][classifiedId] = count;
@@ -130,19 +128,20 @@ public class ConfusionMatrix implements Summarizable {
   }
   
   @Override
-  public String summarize() {
+  public String toString() {
     StringBuilder returnString = new StringBuilder(200);
     returnString.append("=======================================================").append('\n');
     returnString.append("Confusion Matrix\n");
     returnString.append("-------------------------------------------------------").append('\n');
     
-    for (String correctLabel : this.labelMap.keySet()) {
-      returnString.append(StringUtils.rightPad(getSmallLabel(labelMap.get(correctLabel)), 5)).append('\t');
+    for (Map.Entry<String,Integer> entry : this.labelMap.entrySet()) {
+      returnString.append(StringUtils.rightPad(getSmallLabel(entry.getValue()), 5)).append('\t');
     }
     
     returnString.append("<--Classified as").append('\n');
     
-    for (String correctLabel : this.labelMap.keySet()) {
+    for (Map.Entry<String,Integer> entry : this.labelMap.entrySet()) {
+      String correctLabel = entry.getKey();
       int labelTotal = 0;
       for (String classifiedLabel : this.labelMap.keySet()) {
         returnString.append(
@@ -150,7 +149,7 @@ public class ConfusionMatrix implements Summarizable {
         labelTotal += getCount(correctLabel, classifiedLabel);
       }
       returnString.append(" |  ").append(StringUtils.rightPad(String.valueOf(labelTotal), 6)).append('\t')
-          .append(StringUtils.rightPad(getSmallLabel(labelMap.get(correctLabel)), 5))
+          .append(StringUtils.rightPad(getSmallLabel(entry.getValue()), 5))
           .append(" = ").append(correctLabel).append('\n');
     }
     returnString.append("Default Category: ").append(defaultLabel).append(": ").append(

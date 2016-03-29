@@ -20,11 +20,10 @@ package org.apache.mahout.clustering.display;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.nio.charset.Charset;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -45,20 +44,19 @@ class DisplaySpectralKMeans extends DisplayClustering {
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     Path samples = new Path("samples");
     Path output = new Path("output");
-    HadoopUtil.overwriteOutput(samples);
-    HadoopUtil.overwriteOutput(output);
+    Configuration conf = new Configuration();
+    HadoopUtil.delete(conf, samples);
+    HadoopUtil.delete(conf, output);
 
     RandomUtils.useTestSeed();
     DisplayClustering.generateSamples();
     writeSampleData(samples);
     Path affinities = new Path(output, "affinities");
-    Configuration conf = new Configuration();
     FileSystem fs = FileSystem.get(output.toUri(), conf);
     if (!fs.exists(output)) {
       fs.mkdirs(output);
     }
-    Writer writer = new OutputStreamWriter(
-        new FileOutputStream(new File(affinities.toString())), Charset.forName("UTF-8"));
+    Writer writer = Files.newWriter(new File(affinities.toString()), Charsets.UTF_8);
     try {
       for (int i = 0; i < SAMPLE_DATA.size(); i++) {
         for (int j = 0; j < SAMPLE_DATA.size(); j++) {

@@ -19,11 +19,10 @@ package org.apache.mahout.classifier.bayes;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.charset.Charset;
 import java.util.List;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -51,8 +50,7 @@ public final class BayesClassifierSelfTest extends MahoutTestCase {
     super.setUp();
 
     File tempInputFile = getTestTempFile("bayesinput");
-    BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(new FileOutputStream(tempInputFile), Charset.forName("UTF-8")));
+    BufferedWriter writer = Files.newWriter(tempInputFile, Charsets.UTF_8);
     for (String[] entry : ClassifierData.DATA) {
       writer.write(entry[0] + '\t' + entry[1] + '\n');
     }
@@ -107,8 +105,7 @@ public final class BayesClassifierSelfTest extends MahoutTestCase {
     TestClassifier.classifyParallel(params);
     Configuration conf = new Configuration();
     Path outputFiles = getTestTempFilePath("bayesinput-output/part*");
-    FileSystem fs = FileSystem.get(outputFiles.toUri(), conf);
-    matrix = BayesClassifierDriver.readResult(fs, outputFiles, conf, params).getConfusionMatrix();
+    matrix = BayesClassifierDriver.readResult(outputFiles, conf, params).getConfusionMatrix();
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
         assertEquals(i == j ? 4 : 0, matrix[i][j]);
@@ -158,8 +155,7 @@ public final class BayesClassifierSelfTest extends MahoutTestCase {
     TestClassifier.classifyParallel(params);
     Configuration conf = new Configuration();
     Path outputFiles = getTestTempFilePath("bayesinput-output/part*");
-    FileSystem fs = FileSystem.get(outputFiles.toUri(), conf);
-    matrix = BayesClassifierDriver.readResult(fs, outputFiles, conf, params).getConfusionMatrix();
+    matrix = BayesClassifierDriver.readResult(outputFiles, conf, params).getConfusionMatrix();
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
         assertEquals(i == j ? 4 : 0, matrix[i][j]);

@@ -22,7 +22,7 @@ public class SingularValueDecomposition implements java.io.Serializable {
   private final int n;
   
   /**To handle the case where numRows() < numCols() and to use the fact that SVD(A')=VSU'=> SVD(A')'=SVD(A)**/
-  private boolean transpositionNeeded; 
+  private boolean transpositionNeeded = false;
   
   /**
    * Constructs and returns a new singular value decomposition object; The
@@ -34,7 +34,7 @@ public class SingularValueDecomposition implements java.io.Serializable {
    */
   public SingularValueDecomposition(Matrix arg) {
     if (arg.numRows() < arg.numCols()) {
-      transpositionNeeded = true;		  		 
+      transpositionNeeded = true;
     }
     
     // Derived from LINPACK code.

@@ -32,6 +32,10 @@ import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.common.distance.ManhattanDistanceMeasure;
 import org.apache.mahout.math.DenseVector;
 
+/**
+ * Java desktop graphics class that runs canopy clustering and displays the results.
+ * This class generates random data and clusters it.
+ */
 class DisplayCanopy extends DisplayClustering {
 
   DisplayCanopy() {
@@ -68,14 +72,15 @@ class DisplayCanopy extends DisplayClustering {
   public static void main(String[] args) throws Exception {
     Path samples = new Path("samples");
     Path output = new Path("output");
-    HadoopUtil.overwriteOutput(samples);
-    HadoopUtil.overwriteOutput(output);
+    Configuration conf = new Configuration();
+    HadoopUtil.delete(conf, samples);
+    HadoopUtil.delete(conf, output);
     RandomUtils.useTestSeed();
     generateSamples();
     writeSampleData(samples);
     //boolean b = true;
     //if (b) {
-    CanopyDriver.buildClusters(new Configuration(), samples, output, new ManhattanDistanceMeasure(), T1, T2, true);
+    CanopyDriver.buildClusters(conf, samples, output, new ManhattanDistanceMeasure(), T1, T2, true);
     loadClusters(output);
     //} else {
     //  List<Vector> points = new ArrayList<Vector>();
