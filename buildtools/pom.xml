@@ -22,10 +22,6 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.apache.mahout</groupId>
-  <artifactId>mahout-buildtools</artifactId>
-  <version>0.5-SNAPSHOT</version>
-
   <parent>
     <groupId>org.apache.mahout</groupId>
     <artifactId>mahout</artifactId>
@@ -33,13 +29,9 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
+  <artifactId>mahout-buildtools</artifactId>
   <name>Mahout Build Tools</name>
 
   <packaging>jar</packaging>
 
-  <scm>
-    <connection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/buildtools</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/mahout/trunk/buildtools</developerConnection>
-    <url>https://svn.apache.org/repos/asf/mahout/trunk/buildtools</url>
-  </scm>
 </project>
