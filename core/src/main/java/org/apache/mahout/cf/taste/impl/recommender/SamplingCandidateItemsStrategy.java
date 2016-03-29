@@ -19,11 +19,9 @@ package org.apache.mahout.cf.taste.impl.recommender;
 
 import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.impl.common.FastIDSet;
-import org.apache.mahout.cf.taste.impl.common.LongPrimitiveIterator;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
-import org.apache.mahout.cf.taste.recommender.CandidateItemsStrategy;
 import org.apache.mahout.common.iterator.FixedSizeSamplingIterator;
 
 import java.util.Iterator;
@@ -37,7 +35,7 @@ import java.util.Iterator;
  * max(defaultMaxPrefsPerItemConsidered, userItemCountFactor * log(max(N_users, N_items)))
  * </pre></p>
  */
-public class SamplingCandidateItemsStrategy implements CandidateItemsStrategy {
+public class SamplingCandidateItemsStrategy extends AbstractCandidateItemsStrategy {
 
   private final int defaultMaxPrefsPerItemConsidered;
   private final int userItemCountMultiplier;
@@ -67,14 +65,11 @@ public class SamplingCandidateItemsStrategy implements CandidateItemsStrategy {
   }
 
   @Override
-  public FastIDSet getCandidateItems(long userID, DataModel dataModel) throws TasteException {
+  protected FastIDSet doGetCandidateItems(long[] preferredItemIDs, DataModel dataModel) throws TasteException {
     int maxPrefsPerItemConsidered = (int) Math.max(defaultMaxPrefsPerItemConsidered,
         userItemCountMultiplier * Math.log(Math.max(dataModel.getNumUsers(), dataModel.getNumItems())));
     FastIDSet possibleItemsIDs = new FastIDSet();
-    FastIDSet itemIDs = dataModel.getItemIDsFromUser(userID);
-    LongPrimitiveIterator itemIDIterator = itemIDs.iterator();
-    while (itemIDIterator.hasNext()) {
-      long itemID = itemIDIterator.next();
+    for (long itemID : preferredItemIDs) {
       PreferenceArray prefs = dataModel.getPreferencesForItem(itemID);
       int prefsConsidered = Math.min(prefs.length(), maxPrefsPerItemConsidered);
       Iterator<Preference> sampledPrefs = new FixedSizeSamplingIterator(prefsConsidered, prefs.iterator());
@@ -82,8 +77,7 @@ public class SamplingCandidateItemsStrategy implements CandidateItemsStrategy {
         possibleItemsIDs.addAll(dataModel.getItemIDsFromUser(sampledPrefs.next().getUserID()));
       }
     }
-    possibleItemsIDs.removeAll(itemIDs);
+    possibleItemsIDs.removeAll(preferredItemIDs);
     return possibleItemsIDs;
   }
-
 }

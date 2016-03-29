@@ -18,25 +18,25 @@
 package org.apache.mahout.math.decomposer.lanczos;
 
 
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.MatrixSlice;
 import org.apache.mahout.math.SparseRowMatrix;
-import org.apache.mahout.math.VectorIterable;
-import org.apache.mahout.math.function.PlusMult;
-import org.apache.mahout.math.function.UnaryFunction;
-import static org.apache.mahout.math.function.Functions.*;
 import org.apache.mahout.math.Vector;
+import org.apache.mahout.math.VectorIterable;
+import org.apache.mahout.math.function.DoubleFunction;
+import org.apache.mahout.math.function.Functions;
+import org.apache.mahout.math.function.PlusMult;
 import org.apache.mahout.math.matrix.DoubleMatrix1D;
 import org.apache.mahout.math.matrix.DoubleMatrix2D;
 import org.apache.mahout.math.matrix.impl.DenseDoubleMatrix2D;
 import org.apache.mahout.math.matrix.linalg.EigenvalueDecomposition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * <p>Simple implementation of the <a href="http://en.wikipedia.org/wiki/Lanczos_algorithm">Lanczos algorithm</a> for
@@ -68,7 +68,6 @@ public class LanczosSolver {
   private static final Logger log = LoggerFactory.getLogger(LanczosSolver.class);
 
   public static final double SAFE_MAX = 1.0e150;
-
   private static final double NANOS_IN_MILLI = 1.0e6;
 
   public enum TimingSection {
@@ -77,15 +76,16 @@ public class LanczosSolver {
 
   private final Map<TimingSection, Long> startTimes = new EnumMap<TimingSection, Long>(TimingSection.class);
   private final Map<TimingSection, Long> times = new EnumMap<TimingSection, Long>(TimingSection.class);
-  protected double scaleFactor = 0;
+  private double scaleFactor;
 
-  private static final class Scale implements UnaryFunction {
+  private static final class Scale implements DoubleFunction {
     private final double d;
 
     private Scale(double d) {
       this.d = d;
     }
 
+    @Override
     public double apply(double arg1) {
       return arg1 * d;
     }
@@ -115,7 +115,7 @@ public class LanczosSolver {
       Vector nextVector = isSymmetric ? corpus.times(currentVector) : corpus.timesSquared(currentVector);
       log.info("{} passes through the corpus so far...", i);
       calculateScaleFactor(nextVector);
-      nextVector.assign(new Scale(1 / scaleFactor));
+      nextVector.assign(new Scale(1.0 / scaleFactor));
       nextVector.assign(previousVector, new PlusMult(-beta));
       // now orthogonalize
       double alpha = currentVector.dot(nextVector);
@@ -152,7 +152,7 @@ public class LanczosSolver {
     endTime(TimingSection.TRIDIAG_DECOMP);
     startTime(TimingSection.FINAL_EIGEN_CREATE);
 
-    for (int i = 0; i < basis.numRows() - 1; i++) {
+    for (int i = 0; i < basis.numRows(); i++) {
       Vector realEigen = new DenseVector(corpus.numCols());
       // the eigenvectors live as columns of V, in reverse order.  Weird but true.
       DoubleMatrix1D ejCol = eigenVects.viewColumn(basis.numRows() - i - 1);
@@ -162,15 +162,16 @@ public class LanczosSolver {
       }
       realEigen = realEigen.normalize();
       eigenVectors.assignRow(i, realEigen);
-      log.info("Eigenvector {} found with eigenvalue {}", i, eigenVals.get(i));
-      eigenValues.add(eigenVals.get(i));
+      double e = Math.sqrt(eigenVals.get(i) * scaleFactor);
+      log.info("Eigenvector {} found with eigenvalue {}", i, e);
+      eigenValues.add(e);
     }
     log.info("LanczosSolver finished.");
     endTime(TimingSection.FINAL_EIGEN_CREATE);
   }
 
   protected void calculateScaleFactor(Vector nextVector) {
-    if(scaleFactor == 0) {
+    if (scaleFactor == 0.0) {
       scaleFactor = nextVector.norm(2);
     }
   }
@@ -200,10 +201,10 @@ public class LanczosSolver {
       if (v == null) {
         v = new DenseVector(vector.size()).plus(vector);
       } else {
-        v.assign(vector, PLUS);
+        v.assign(vector, Functions.PLUS);
       }
     }
-    v.assign(div(v.norm(2)));
+    v.assign(Functions.div(v.norm(2)));
     return v;
   }
 

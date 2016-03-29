@@ -24,17 +24,15 @@ import org.apache.mahout.math.function.SquareRootFunction;
  * numerically-stable. See http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
  */
 public class OnlineGaussianAccumulator implements GaussianAccumulator {
-  private double n = 0;
 
+  private double sumWeight;
   private Vector mean;
-
-  private Vector m2;
-
+  private Vector s;
   private Vector variance;
 
   @Override
   public double getN() {
-    return n;
+    return sumWeight;
   }
 
   @Override
@@ -47,23 +45,43 @@ public class OnlineGaussianAccumulator implements GaussianAccumulator {
     return variance.clone().assign(new SquareRootFunction());
   }
 
+  /* from Wikipedia: http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+   * 
+   * Weighted incremental algorithm
+   * 
+   * def weighted_incremental_variance(dataWeightPairs):
+   * mean = 0
+   * S = 0
+   * sumweight = 0
+   * for x, weight in dataWeightPairs: # Alternately "for x in zip(data, weight):"
+   *     temp = weight + sumweight
+   *     Q = x - mean
+   *      R = Q * weight / temp
+   *      S = S + sumweight * Q * R
+   *      mean = mean + R
+   *      sumweight = temp
+   *  Variance = S / (sumweight-1)  # if sample is the population, omit -1
+   *  return Variance
+   */
   @Override
-  public void observe(Vector x) {
-    n++;
-    Vector delta;
-    if (mean != null) {
-      delta = x.minus(mean);
-    } else {
+  public void observe(Vector x, double weight) {
+    double temp = weight + sumWeight;
+    Vector q;
+    if (mean == null) {
       mean = x.like();
-      delta = x.clone();
-    }
-    mean = mean.plus(delta.divide(n));
-    if (m2 != null) {
-      m2 = m2.plus(delta.times(x.minus(mean)));
+      q = x.clone();
     } else {
-      m2 = delta.times(x.minus(mean));
+      q = x.minus(mean);
     }
-    variance = m2.divide(n - 1);
+    Vector r = q.times(weight).divide(temp);
+    if (s == null) {
+      s = q.times(sumWeight).times(r);
+    } else {
+      s = s.plus(q.times(sumWeight).times(r));
+    }
+    mean = mean.plus(r);
+    sumWeight = temp;
+    variance = s.divide(sumWeight - 1); //  # if sample is the population, omit -1
   }
 
   @Override
@@ -73,8 +91,8 @@ public class OnlineGaussianAccumulator implements GaussianAccumulator {
 
   @Override
   public double getAverageStd() {
-    if (n == 0) {
-      return 0;
+    if (sumWeight == 0.0) {
+      return 0.0;
     } else {
       Vector std = getStd();
       return std.zSum() / std.size();

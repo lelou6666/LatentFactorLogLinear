@@ -19,7 +19,7 @@ package org.apache.mahout.ga.watchmaker;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -27,8 +27,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.SequenceFile.Reader;
-import org.apache.hadoop.io.SequenceFile.Sorter;
+import org.apache.hadoop.io.SequenceFile;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileValueIterable;
 
 /** Utility Class that deals with the output. */
 public final class OutputUtils {
@@ -48,7 +48,7 @@ public final class OutputUtils {
    */
   public static Path[] listOutputFiles(FileSystem fs, Path outpath) throws IOException {
     FileStatus[] status = fs.listStatus(outpath);
-    List<Path> outpaths = new ArrayList<Path>();
+    Collection<Path> outpaths = new ArrayList<Path>();
     for (FileStatus s : status) {
       if (!s.isDir()) {
         outpaths.add(s.getPath());
@@ -72,8 +72,8 @@ public final class OutputUtils {
   public static void importEvaluations(FileSystem fs,
                                        Configuration conf,
                                        Path outpath,
-                                       List<Double> evaluations) throws IOException {
-    Sorter sorter = new Sorter(fs, LongWritable.class, DoubleWritable.class, conf);
+                                       Collection<Double> evaluations) throws IOException {
+    SequenceFile.Sorter sorter = new SequenceFile.Sorter(fs, LongWritable.class, DoubleWritable.class, conf);
     
     // merge and sort the outputs
     Path[] outfiles = listOutputFiles(fs, outpath);
@@ -81,15 +81,8 @@ public final class OutputUtils {
     sorter.merge(outfiles, output);
     
     // import the evaluations
-    LongWritable key = new LongWritable();
-    DoubleWritable value = new DoubleWritable();
-    Reader reader = new Reader(fs, output, conf);
-    try {
-      while (reader.next(key, value)) {
-        evaluations.add(value.get());
-      }
-    } finally {
-      reader.close();
+    for (DoubleWritable value : new SequenceFileValueIterable<DoubleWritable>(output, true, conf)) {
+      evaluations.add(value.get());
     }
   }
   

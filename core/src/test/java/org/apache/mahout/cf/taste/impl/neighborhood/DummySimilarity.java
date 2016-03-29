@@ -19,23 +19,22 @@ package org.apache.mahout.cf.taste.impl.neighborhood;
 
 import org.apache.mahout.cf.taste.common.Refreshable;
 import org.apache.mahout.cf.taste.common.TasteException;
+import org.apache.mahout.cf.taste.impl.similarity.AbstractItemSimilarity;
 import org.apache.mahout.cf.taste.model.DataModel;
-import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
 import org.apache.mahout.cf.taste.similarity.PreferenceInferrer;
 import org.apache.mahout.cf.taste.similarity.UserSimilarity;
 
 import java.util.Collection;
 
-final class DummySimilarity implements UserSimilarity, ItemSimilarity {
-  
-  private final DataModel dataModel;
-  
+final class DummySimilarity extends AbstractItemSimilarity implements UserSimilarity {
+
   DummySimilarity(DataModel dataModel) {
-    this.dataModel = dataModel;
+    super(dataModel);
   }
   
   @Override
   public double userSimilarity(long userID1, long userID2) throws TasteException {
+    DataModel dataModel = getDataModel();
     return 1.0 / (1.0 + Math.abs(dataModel.getPreferencesFromUser(userID1).get(0).getValue()
                                  - dataModel.getPreferencesFromUser(userID2).get(0).getValue()));
   }
@@ -60,7 +59,7 @@ final class DummySimilarity implements UserSimilarity, ItemSimilarity {
   public void setPreferenceInferrer(PreferenceInferrer inferrer) {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public void refresh(Collection<Refreshable> alreadyRefreshed) {
   // do nothing

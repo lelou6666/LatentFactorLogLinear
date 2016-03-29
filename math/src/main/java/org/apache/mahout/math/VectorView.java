@@ -18,7 +18,8 @@
 package org.apache.mahout.math;
 
 import java.util.Iterator;
-import java.util.NoSuchElementException;
+
+import com.google.common.collect.AbstractIterator;
 
 /** Implements subset view of a Vector */
 public class VectorView extends AbstractVector {
@@ -52,26 +53,32 @@ public class VectorView extends AbstractVector {
     return r;
   }
 
+  @Override
   public boolean isDense() {
     return vector.isDense();
   }
 
+  @Override
   public boolean isSequentialAccess() {
     return vector.isSequentialAccess();
   }
 
+  @Override
   public VectorView like() {
     return new VectorView(vector.like(), offset, size());
   }
 
+  @Override
   public double getQuick(int index) {
     return vector.getQuick(offset + index);
   }
 
+  @Override
   public void setQuick(int index, double value) {
     vector.setQuick(offset + index, value);
   }
 
+  @Override
   public int getNumNondefaultElements() {
     return size();
   }
@@ -92,122 +99,83 @@ public class VectorView extends AbstractVector {
     return index >= offset && index < offset + size();
   }
 
+  @Override
   public Iterator<Element> iterateNonZero() {
     return new NonZeroIterator();
   }
 
+  @Override
   public Iterator<Element> iterator() {
     return new AllIterator();
   }
 
-  public final class NonZeroIterator implements Iterator<Element> {
+  public final class NonZeroIterator extends AbstractIterator<Element> {
 
     private final Iterator<Element> it;
-
-    private Element el;
 
     private NonZeroIterator() {
       it = vector.iterateNonZero();
-      buffer();
     }
 
-    private void buffer() {
+    @Override
+    protected Element computeNext() {
       while (it.hasNext()) {
-        el = it.next();
+        Element el = it.next();
         if (isInView(el.index()) && el.get() != 0) {
-          final Element decorated = vector.getElement(el.index());
-          el = new Element() {
-            public double get() {
-              return decorated.get();
-            }
-
-            public int index() {
-              return decorated.index() - offset;
-            }
-
-            public void set(double value) {
-              decorated.set(value);
-            }
-          };
-          return;
+          Element decorated = vector.getElement(el.index());
+          return new DecoratorElement(decorated);
         }
       }
-      el = null; // No element was found
+      return endOfData();
     }
 
-    public Element next() {
-      if (!hasNext()) {
-        throw new NoSuchElementException();
-      }
-      Element buffer = el;
-      buffer();
-      return buffer;
-    }
-
-    public boolean hasNext() {
-      return el != null;
-    }
-
-    /** @throws UnsupportedOperationException all the time. method not implemented. */
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
   }
 
-  public final class AllIterator implements Iterator<Element> {
+  public final class AllIterator extends AbstractIterator<Element> {
 
     private final Iterator<Element> it;
 
-    private Element el;
-
     private AllIterator() {
       it = vector.iterator();
-      buffer();
     }
 
-    private void buffer() {
+    @Override
+    protected Element computeNext() {
       while (it.hasNext()) {
-        el = it.next();
+        Element el = it.next();
         if (isInView(el.index())) {
-          final Element decorated = vector.getElement(el.index());
-          el = new Element() {
-            public double get() {
-              return decorated.get();
-            }
-
-            public int index() {
-              return decorated.index() - offset;
-            }
-
-            public void set(double value) {
-              decorated.set(value);
-            }
-          };
-          return;
+          Element decorated = vector.getElement(el.index());
+          return new DecoratorElement(decorated);
         }
       }
-      el = null; // No element was found
+      return endOfData(); // No element was found
     }
 
-    public Element next() {
-      if (!hasNext()) {
-        throw new NoSuchElementException();
-      }
-      Element buffer = el;
-      buffer();
-      return buffer;
-    }
-
-    public boolean hasNext() {
-      return el != null;
-    }
-
-    /** @throws UnsupportedOperationException all the time. method not implemented. */
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
   }
 
+  private final class DecoratorElement implements Element {
+
+    private final Element decorated;
+
+    private DecoratorElement(Element decorated) {
+      this.decorated = decorated;
+    }
+
+    @Override
+    public double get() {
+      return decorated.get();
+    }
+
+    @Override
+    public int index() {
+      return decorated.index() - offset;
+    }
+
+    @Override
+    public void set(double value) {
+      decorated.set(value);
+    }
+  }
 
   @Override
   public double dot(Vector x) {

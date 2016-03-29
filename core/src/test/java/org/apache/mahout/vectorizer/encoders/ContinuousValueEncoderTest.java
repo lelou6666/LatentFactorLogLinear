@@ -45,6 +45,8 @@ public final class ContinuousValueEncoderTest extends MahoutTestCase {
     assertEquals(123, v2.maxValue(), 0);
     assertEquals(2 * 123, v2.norm(1), 0);
 
+    // v1 has one probe, v2 has two.  The first probe in v2 should be in the same
+    // place as the only probe in v1
     v1 = v2.minus(v1);
     assertEquals(123, v1.maxValue(), 0);
     assertEquals(123, v1.norm(1), 0);
@@ -61,6 +63,13 @@ public final class ContinuousValueEncoderTest extends MahoutTestCase {
     assertEquals(2 * 30, v1.norm(1), 0);
     assertEquals(30, v1.get(10), 0);
     assertEquals(30, v1.get(18), 0);
+
+    v2 = new DenseVector(20);
+    v3 = new DenseVector(20);
+    enc.setProbes(6);
+    enc.addToVector("145", v2);
+    enc.addToVector((byte[]) null, 145, v3);
+    assertEquals(0, v2.minus(v3).norm(1), 0);
 
     try {
       enc.addToVector("foobar", v1);

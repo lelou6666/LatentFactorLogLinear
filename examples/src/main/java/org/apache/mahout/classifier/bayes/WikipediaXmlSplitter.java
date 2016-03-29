@@ -40,7 +40,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.BZip2Codec;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.mahout.common.CommandLineUtil;
-import org.apache.mahout.common.FileLineIterator;
+import org.apache.mahout.common.iterator.FileLineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,11 +190,13 @@ public final class WikipediaXmlSplitter {
           content.append("</mediawiki>");
           filenumber++;
           String filename = outputDirPath + "/chunk-" + decimalFormatter.format(filenumber) + ".xml";
-          BufferedWriter chunkWriter = new BufferedWriter(new OutputStreamWriter(fs
-              .create(new Path(filename)), "UTF-8"));
-          
-          chunkWriter.write(content.toString(), 0, content.length());
-          chunkWriter.close();
+          BufferedWriter chunkWriter =
+              new BufferedWriter(new OutputStreamWriter(fs.create(new Path(filename)), "UTF-8"));
+          try {
+            chunkWriter.write(content.toString(), 0, content.length());
+          } finally {
+            chunkWriter.close();
+          }
           if (filenumber >= numChunks) {
             break;
           }

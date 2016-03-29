@@ -20,9 +20,7 @@ package org.apache.mahout.fpm.pfpgrowth;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -38,7 +36,6 @@ import org.apache.mahout.fpm.pfpgrowth.convertors.ContextWriteOutputCollector;
 import org.apache.mahout.fpm.pfpgrowth.convertors.integer.IntegerStringOutputConverter;
 import org.apache.mahout.fpm.pfpgrowth.convertors.string.TopKStringPatterns;
 import org.apache.mahout.fpm.pfpgrowth.fpgrowth.FPGrowth;
-import org.apache.mahout.fpm.pfpgrowth.fpgrowth.FPTreeDepthCache;
 import org.apache.mahout.math.list.IntArrayList;
 import org.apache.mahout.math.map.OpenLongObjectHashMap;
 import org.apache.mahout.math.map.OpenObjectIntHashMap;
@@ -48,7 +45,6 @@ import org.apache.mahout.math.map.OpenObjectIntHashMap;
  * outputs the the Top K frequent Patterns for each group.
  * 
  */
-
 public class ParallelFPGrowthReducer extends Reducer<LongWritable,TransactionTree,Text,TopKStringPatterns> {
   
   private final List<String> featureReverseMap = new ArrayList<String>();
@@ -64,12 +60,9 @@ public class ParallelFPGrowthReducer extends Reducer<LongWritable,TransactionTre
   @Override
   protected void reduce(LongWritable key, Iterable<TransactionTree> values, Context context) throws IOException {
     TransactionTree cTree = new TransactionTree();
-    int nodes = 0;
     for (TransactionTree tr : values) {
-      Iterator<Pair<List<Integer>,Long>> it = tr.getIterator();
-      while (it.hasNext()) {
-        Pair<List<Integer>,Long> p = it.next();
-        nodes += cTree.addPattern(p.getFirst(), p.getSecond());
+      for (Pair<List<Integer>,Long> p : tr) {
+        cTree.addPattern(p.getFirst(), p.getSecond());
       }
     }
     
@@ -79,22 +72,11 @@ public class ParallelFPGrowthReducer extends Reducer<LongWritable,TransactionTre
       
     }
     
-    Collections.sort(localFList, new Comparator<Pair<Integer,Long>>() {
-      
-      @Override
-      public int compare(Pair<Integer,Long> o1, Pair<Integer,Long> o2) {
-        int ret = o2.getSecond().compareTo(o1.getSecond());
-        if (ret != 0) {
-          return ret;
-        }
-        return o1.getFirst().compareTo(o2.getFirst());
-      }
-      
-    });
+    Collections.sort(localFList, new CountDescendingPairComparator<Integer,Long>());
     
     FPGrowth<Integer> fpGrowth = new FPGrowth<Integer>();
     fpGrowth.generateTopKFrequentPatterns(
-        cTree.getIterator(),
+        cTree.iterator(),
         localFList,
         minSupport,
         maxHeapSize,
@@ -109,7 +91,7 @@ public class ParallelFPGrowthReducer extends Reducer<LongWritable,TransactionTre
   protected void setup(Context context) throws IOException, InterruptedException {
     
     super.setup(context);
-    Parameters params = Parameters.fromString(context.getConfiguration().get(PFPGrowth.PFP_PARAMETERS, ""));
+    Parameters params = new Parameters(context.getConfiguration().get(PFPGrowth.PFP_PARAMETERS, ""));
     
     int i = 0;
     for (Pair<String,Long> e : PFPGrowth.deserializeList(params, PFPGrowth.F_LIST, context.getConfiguration())) {
@@ -134,7 +116,5 @@ public class ParallelFPGrowthReducer extends Reducer<LongWritable,TransactionTre
     }
     maxHeapSize = Integer.valueOf(params.get(PFPGrowth.MAX_HEAPSIZE, "50"));
     minSupport = Integer.valueOf(params.get(PFPGrowth.MIN_SUPPORT, "3"));
-    FPTreeDepthCache.setFirstLevelCacheSize(Integer.valueOf(params.get(PFPGrowth.TREE_CACHE_SIZE, Integer
-        .toString(FPTreeDepthCache.getFirstLevelCacheSize()))));
   }
 }

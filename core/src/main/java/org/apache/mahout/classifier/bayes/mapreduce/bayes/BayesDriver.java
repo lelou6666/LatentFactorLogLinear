@@ -19,6 +19,7 @@ package org.apache.mahout.classifier.bayes.mapreduce.bayes;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.mahout.classifier.bayes.common.BayesParameters;
 import org.apache.mahout.classifier.bayes.mapreduce.common.BayesFeatureDriver;
@@ -36,7 +37,9 @@ public class BayesDriver implements BayesJob {
   
   @Override
   public void runJob(Path input, Path output, BayesParameters params) throws IOException {
-    HadoopUtil.overwriteOutput(output);
+
+    Configuration conf = new Configuration();
+    HadoopUtil.delete(conf, output);
     
     log.info("Reading features...");
     // Read the features in each document normalized by length of each document
@@ -59,27 +62,27 @@ public class BayesDriver implements BayesJob {
     BayesThetaNormalizerDriver normalizer = new BayesThetaNormalizerDriver();
     normalizer.runJob(input, output, params);
     
-    if (Boolean.parseBoolean(params.get("skipCleanup"))) {
+    if (params.isSkipCleanup()) {
       return;
     }
     
     Path docCountOutPath = new Path(output, "trainer-docCount");
-    HadoopUtil.overwriteOutput(docCountOutPath);
+    HadoopUtil.delete(conf, docCountOutPath);
 
     Path termDocCountOutPath = new Path(output, "trainer-termDocCount");
-    HadoopUtil.overwriteOutput(termDocCountOutPath);
+    HadoopUtil.delete(conf, termDocCountOutPath);
 
     Path featureCountOutPath = new Path(output, "trainer-featureCount");
-    HadoopUtil.overwriteOutput(featureCountOutPath);
+    HadoopUtil.delete(conf, featureCountOutPath);
 
     Path wordFreqOutPath = new Path(output, "trainer-wordFreq");
-    HadoopUtil.overwriteOutput(wordFreqOutPath);
+    HadoopUtil.delete(conf, wordFreqOutPath);
 
     Path vocabCountPath = new Path(output, "trainer-tfIdf/trainer-vocabCount");
-    HadoopUtil.overwriteOutput(vocabCountPath);
+    HadoopUtil.delete(conf, vocabCountPath);
 
     Path vocabCountOutPath = new Path(output, "trainer-vocabCount");
-    HadoopUtil.overwriteOutput(vocabCountOutPath);
+    HadoopUtil.delete(conf, vocabCountOutPath);
     
   }
 }

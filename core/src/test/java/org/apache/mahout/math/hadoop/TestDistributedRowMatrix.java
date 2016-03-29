@@ -17,10 +17,15 @@
 
 package org.apache.mahout.math.hadoop;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.mahout.clustering.ClusteringTestUtils;
 import org.apache.mahout.common.MahoutTestCase;
 import org.apache.mahout.math.Matrix;
@@ -32,19 +37,16 @@ import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.math.decomposer.SolverTest;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-
 public final class TestDistributedRowMatrix extends MahoutTestCase {
+  public static final String TEST_PROPERTY_KEY = "test.property.key";
+  public static final String TEST_PROPERTY_VALUE = "test.property.value";
 
-  public static void assertEquals(VectorIterable m, VectorIterable mtt, double errorTolerance) {
+  private static void assertEquals(VectorIterable m, VectorIterable mtt, double errorTolerance) {
     Iterator<MatrixSlice> mIt = m.iterateAll();
     Iterator<MatrixSlice> mttIt = mtt.iterateAll();
     Map<Integer, Vector> mMap = new HashMap<Integer,Vector>();
     Map<Integer, Vector> mttMap = new HashMap<Integer, Vector>();
-    while(mIt.hasNext() && mttIt.hasNext()) {
+    while (mIt.hasNext() && mttIt.hasNext()) {
       MatrixSlice ms = mIt.next();
       mMap.put(ms.index(), ms.vector());
       MatrixSlice mtts = mttIt.next();
@@ -109,6 +111,185 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
     assertEquals(expected, product, EPSILON);
   }
 
+  @Test
+  public void testMatrixMultiplactionJobConfBuilder() throws Exception {    
+    Configuration initialConf = createInitialConf();
+        
+    Path baseTmpDirPath = getTestTempDirPath("testpaths");    
+    Path aPath = new Path(baseTmpDirPath, "a");
+    Path bPath = new Path(baseTmpDirPath, "b");
+    Path outPath = new Path(baseTmpDirPath, "out");
+    
+    Configuration mmJobConf = MatrixMultiplicationJob.createMatrixMultiplyJobConf(aPath, bPath, outPath, 10);
+    Configuration mmCustomJobConf = MatrixMultiplicationJob.createMatrixMultiplyJobConf(initialConf, 
+                                                                                        aPath, 
+                                                                                        bPath, 
+                                                                                        outPath, 
+                                                                                        10);
+    
+    assertNull(mmJobConf.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, mmCustomJobConf.get(TEST_PROPERTY_KEY));  
+  }
+  
+  @Test
+  public void testTransposeJobConfBuilder() throws Exception {
+    Configuration initialConf = createInitialConf();
+    
+    Path baseTmpDirPath = getTestTempDirPath("testpaths");    
+    Path inputPath = new Path(baseTmpDirPath, "input");
+    Path outputPath = new Path(baseTmpDirPath, "output");
+    
+    Configuration transposeJobConf = TransposeJob.buildTransposeJobConf(inputPath, outputPath, 10);
+    Configuration transposeCustomJobConf = TransposeJob.buildTransposeJobConf(initialConf, inputPath, outputPath, 10);
+
+    assertNull(transposeJobConf.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, transposeCustomJobConf.get(TEST_PROPERTY_KEY));
+  }
+
+  @Test public void testTimesSquaredJobConfBuilders() throws Exception {
+    Configuration initialConf = createInitialConf();
+
+    Path baseTmpDirPath = getTestTempDirPath("testpaths");    
+    Path inputPath = new Path(baseTmpDirPath, "input");
+    Path outputPath = new Path(baseTmpDirPath, "output");
+
+    Vector v = new RandomAccessSparseVector(50);
+    v.assign(1.0);
+
+    Configuration timesSquaredJobConf1 = TimesSquaredJob.createTimesSquaredJobConf(v, inputPath, outputPath);
+    Configuration customTimesSquaredJobConf1 = TimesSquaredJob.createTimesSquaredJobConf(initialConf, v, inputPath, outputPath);
+
+    assertNull(timesSquaredJobConf1.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, customTimesSquaredJobConf1.get(TEST_PROPERTY_KEY));
+    
+    Configuration timesJobConf = TimesSquaredJob.createTimesJobConf(v, 50, inputPath, outputPath);
+    Configuration customTimesJobConf = TimesSquaredJob.createTimesJobConf(initialConf, v, 50, inputPath, outputPath);
+    
+    assertNull(timesJobConf.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, customTimesJobConf.get(TEST_PROPERTY_KEY));
+    
+    Configuration timesSquaredJobConf2 = TimesSquaredJob.createTimesSquaredJobConf(v, 
+                                                                                   inputPath, 
+                                                                                   outputPath, 
+                                                                                   TimesSquaredJob.TimesSquaredMapper.class, 
+                                                                                   TimesSquaredJob.VectorSummingReducer.class);
+    Configuration customTimesSquaredJobConf2 = TimesSquaredJob.createTimesSquaredJobConf(initialConf,
+                                                                                         v, 
+                                                                                         inputPath, 
+                                                                                         outputPath, 
+                                                                                         TimesSquaredJob.TimesSquaredMapper.class, 
+                                                                                         TimesSquaredJob.VectorSummingReducer.class);
+ 
+    assertNull(timesSquaredJobConf2.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, customTimesSquaredJobConf2.get(TEST_PROPERTY_KEY));
+
+    Configuration timesSquaredJobConf3 = TimesSquaredJob.createTimesSquaredJobConf(v,
+                                                                                   50,
+                                                                                   inputPath, 
+                                                                                   outputPath, 
+                                                                                   TimesSquaredJob.TimesSquaredMapper.class, 
+                                                                                   TimesSquaredJob.VectorSummingReducer.class);
+    Configuration customTimesSquaredJobConf3 = TimesSquaredJob.createTimesSquaredJobConf(initialConf,
+                                                                                         v,
+                                                                                         50,
+                                                                                         inputPath, 
+                                                                                         outputPath, 
+                                                                                         TimesSquaredJob.TimesSquaredMapper.class, 
+                                                                                         TimesSquaredJob.VectorSummingReducer.class);
+ 
+    assertNull(timesSquaredJobConf3.get(TEST_PROPERTY_KEY));
+    assertEquals(TEST_PROPERTY_VALUE, customTimesSquaredJobConf3.get(TEST_PROPERTY_KEY));
+  }
+  
+  @Test
+  public void testTimesVectorTempDirDeletion() throws Exception {
+    Configuration conf = new Configuration();
+    Vector v = new RandomAccessSparseVector(50);
+    v.assign(1.0);
+    DistributedRowMatrix dm = randomDistributedMatrix(100, 90, 50, 20, 1.0, false);
+
+    Path outputPath = dm.getOutputTempPath();
+    FileSystem fs = outputPath.getFileSystem(conf);
+
+    deleteContentsOfPath(conf, outputPath);
+
+    assertEquals(0, fs.listStatus(outputPath).length);
+
+    Vector result1 = dm.times(v);
+
+    assertEquals(0, fs.listStatus(outputPath).length);
+    
+    deleteContentsOfPath(conf, outputPath);
+    assertEquals(0, fs.listStatus(outputPath).length);
+    
+    conf.setBoolean(DistributedRowMatrix.KEEP_TEMP_FILES, true);
+    dm.setConf(conf);
+    
+    Vector result2 = dm.times(v);
+
+    FileStatus[] outputStatuses = fs.listStatus(outputPath);
+    assertEquals(1, outputStatuses.length);
+    Path outputTempPath = outputStatuses[0].getPath();
+    Path inputVectorPath = new Path(outputTempPath, TimesSquaredJob.INPUT_VECTOR);
+    Path outputVectorPath = new Path(outputTempPath, TimesSquaredJob.OUTPUT_VECTOR_FILENAME);
+    assertEquals(1, fs.listStatus(inputVectorPath).length);
+    assertEquals(1, fs.listStatus(outputVectorPath).length);
+
+    assertEquals(0.0, result1.getDistanceSquared(result2), EPSILON);
+  }
+
+  @Test
+  public void testTimesSquaredVectorTempDirDeletion() throws Exception {
+    Configuration conf = new Configuration();
+    Vector v = new RandomAccessSparseVector(50);
+    v.assign(1.0);
+    DistributedRowMatrix dm = randomDistributedMatrix(100, 90, 50, 20, 1.0, false);
+
+    Path outputPath = dm.getOutputTempPath();
+    FileSystem fs = outputPath.getFileSystem(conf);
+
+    deleteContentsOfPath(conf, outputPath);
+
+    assertEquals(0, fs.listStatus(outputPath).length);
+
+    Vector result1 = dm.timesSquared(v);
+
+    assertEquals(0, fs.listStatus(outputPath).length);
+    
+    deleteContentsOfPath(conf, outputPath);
+    assertEquals(0, fs.listStatus(outputPath).length);
+    
+    conf.setBoolean(DistributedRowMatrix.KEEP_TEMP_FILES, true);
+    dm.setConf(conf);
+    
+    Vector result2 = dm.timesSquared(v);
+
+    FileStatus[] outputStatuses = fs.listStatus(outputPath);
+    assertEquals(1, outputStatuses.length);
+    Path outputTempPath = outputStatuses[0].getPath();
+    Path inputVectorPath = new Path(outputTempPath, TimesSquaredJob.INPUT_VECTOR);
+    Path outputVectorPath = new Path(outputTempPath, TimesSquaredJob.OUTPUT_VECTOR_FILENAME);
+    assertEquals(1, fs.listStatus(inputVectorPath).length);
+    assertEquals(1, fs.listStatus(outputVectorPath).length);
+    
+    assertEquals(0.0, result1.getDistanceSquared(result2), EPSILON);
+  }
+
+  public Configuration createInitialConf() {
+    Configuration initialConf = new Configuration();
+    initialConf.set(TEST_PROPERTY_KEY, TEST_PROPERTY_VALUE);
+    return initialConf;
+  }
+  
+  private void deleteContentsOfPath(Configuration conf, Path path) throws Exception {
+    FileSystem fs = path.getFileSystem(conf);
+    
+    FileStatus[] statuses = fs.listStatus(path);
+    for (FileStatus status : statuses) {
+      fs.delete(status.getPath(), true);
+    }    
+  }
+    
   public DistributedRowMatrix randomDistributedMatrix(int numRows,
                                                       int nonNullRows,
                                                       int numCols,
@@ -140,14 +321,18 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
         final Iterator<MatrixSlice> it = m.iterator();
         return new Iterator<VectorWritable>() {
           @Override
-          public boolean hasNext() { return it.hasNext(); }
+          public boolean hasNext() {
+            return it.hasNext();
+          }
           @Override
           public VectorWritable next() {
             MatrixSlice slice = it.next();
             return new VectorWritable(slice.vector());
           }
           @Override
-          public void remove() { it.remove(); }
+          public void remove() {
+            it.remove();
+          }
         };
       }
     }, true, new Path(baseTmpDirPath, "distMatrix/part-00000"), fs, conf);
@@ -156,7 +341,7 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
                                                                new Path(baseTmpDirPath, "tmpOut"),
                                                                m.numRows(),
                                                                m.numCols());
-    distMatrix.configure(new JobConf(conf));
+    distMatrix.setConf(new Configuration(conf));
 
     return distMatrix;
   }

@@ -29,7 +29,7 @@ import com.google.common.base.Preconditions;
 /**
  * @see FastByIDMap
  */
-public final class FastIDSet implements Serializable, Cloneable {
+public final class FastIDSet implements Serializable, Cloneable, Iterable<Long> {
   
   private static final double ALLOWED_LOAD_FACTOR = 1.5;
   
@@ -45,7 +45,12 @@ public final class FastIDSet implements Serializable, Cloneable {
   public FastIDSet() {
     this(2);
   }
-  
+
+  public FastIDSet(long[] initialKeys) {
+    this(initialKeys.length);
+    addAll(initialKeys);
+  }
+
   public FastIDSet(int size) {
     Preconditions.checkArgument(size >= 0, "size must be at least 0");
     int max = (int) (RandomUtils.MAX_INT_SMALLER_TWIN_PRIME / ALLOWED_LOAD_FACTOR);
@@ -137,6 +142,7 @@ public final class FastIDSet implements Serializable, Cloneable {
     return false;
   }
   
+  @Override
   public LongPrimitiveIterator iterator() {
     return new KeyIterator();
   }

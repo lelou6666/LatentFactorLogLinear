@@ -25,7 +25,7 @@ import org.uncommons.maths.random.SeedGenerator;
  * Implements an uncommons math compatible generator that avoids /dev/random's tendency to block
  * due to entropy underflow.
  */
-public class FastRandomSeedGenerator implements SeedGenerator {
+public final class FastRandomSeedGenerator implements SeedGenerator {
 
   private final SeedGenerator[] generators = {new DevURandomSeedGenerator(), new SecureRandomSeedGenerator()};
 
@@ -40,6 +40,7 @@ public class FastRandomSeedGenerator implements SeedGenerator {
    * @throws org.uncommons.maths.random.SeedException
    *          If a seed cannot be generated for any reason.
    */
+  @Override
   public byte[] generateSeed(int length) throws SeedException {
     SeedException savedException = null;
     for (SeedGenerator generator : generators) {

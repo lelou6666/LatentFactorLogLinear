@@ -107,12 +107,12 @@ public class Gamma extends AbstractContinousDistribution {
         if (p <= 1.0) {                       // Step 2. Case gds <= 1
           gds = Math.exp(Math.log(p) / alpha);
           if (Math.log(randomGenerator.nextDouble()) <= -gds) {
-            return (gds / rate);
+            return gds / rate;
           }
         } else {                                // Step 3. Case gds > 1
           gds = -Math.log((b - p) / alpha);
           if (Math.log(randomGenerator.nextDouble()) <= ((alpha - 1.0) * Math.log(gds))) {
-            return (gds / rate);
+            return gds / rate;
           }
         }
       }
@@ -137,12 +137,12 @@ public class Gamma extends AbstractContinousDistribution {
       double x = s + 0.5 * t;
       gds = x * x;
       if (t >= 0.0) {
-        return (gds / rate);
+        return gds / rate;
       }         // Immediate acceptance
 
       double u = randomGenerator.nextDouble();
       if (d * u <= t * t * t) {
-        return (gds / rate);
+        return gds / rate;
       } // Squeeze acceptance
 
       double q0 = 0.0;
@@ -159,8 +159,7 @@ public class Gamma extends AbstractContinousDistribution {
         double q3 = 0.0079849875;
         double q2 = 0.0208333723;
         double q1 = 0.0416666664;
-        q0 = ((((((((q9 * r + q8) * r + q7) * r + q6) * r + q5) * r + q4) *
-            r + q3) * r + q2) * r + q1) * r;
+        q0 = ((((((((q9 * r + q8) * r + q7) * r + q6) * r + q5) * r + q4) * r + q3) * r + q2) * r + q1) * r;
         if (alpha > 3.686) {
           if (alpha > 13.022) {
             b = 1.77;
@@ -193,11 +192,11 @@ public class Gamma extends AbstractContinousDistribution {
         if (Math.abs(v) > 0.25) {
           q = q0 - s * t + 0.25 * t * t + (ss + ss) * Math.log(1.0 + v);
         } else {
-          q = q0 + 0.5 * t * t * ((((((((a9 * v + a8) * v + a7) * v + a6) *
-              v + a5) * v + a4) * v + a3) * v + a2) * v + a1) * v;
+          q = q0 + 0.5 * t * t * ((((((((a9 * v + a8) * v + a7) * v + a6)
+              * v + a5) * v + a4) * v + a3) * v + a2) * v + a1) * v;
         }                  // Step 7. Quotient acceptance
         if (Math.log(1.0 - u) <= q) {
-          return (gds / rate);
+          return gds / rate;
         }
       }
 
@@ -222,8 +221,8 @@ public class Gamma extends AbstractContinousDistribution {
         if (Math.abs(v) > 0.25) {
           q = q0 - s * t + 0.25 * t * t + (ss + ss) * Math.log(1.0 + v);
         } else {
-          q = q0 + 0.5 * t * t * ((((((((a9 * v + a8) * v + a7) * v + a6) *
-              v + a5) * v + a4) * v + a3) * v + a2) * v + a1) * v;
+          q = q0 + 0.5 * t * t * ((((((((a9 * v + a8) * v + a7) * v + a6)
+              * v + a5) * v + a4) * v + a3) * v + a2) * v + a1) * v;
         }
         if (q <= 0.0) {
           continue;
@@ -232,12 +231,11 @@ public class Gamma extends AbstractContinousDistribution {
         if (q > 0.5) {
           w = Math.exp(q) - 1.0;
         } else {
-          w = ((((((e7 * q + e6) * q + e5) * q + e4) * q + e3) * q + e2) *
-              q + e1) * q;
+          w = ((((((e7 * q + e6) * q + e5) * q + e4) * q + e3) * q + e2) * q + e1) * q;
         }                            // Step 12. Hat acceptance
         if (c * u * sign_u <= w * Math.exp(e - 0.5 * t * t)) {
           x = s + 0.5 * t;
-          return (x * x / rate);
+          return x * x / rate;
         }
       }
     }
@@ -265,10 +263,39 @@ public class Gamma extends AbstractContinousDistribution {
     if (alpha == 1.0) {
       return rate * Math.exp(-x * rate);
     }
-    return rate * Math.exp((alpha - 1.0) * Math.log(x * rate) - x * rate - Fun.logGamma(alpha));
+    return rate * Math.exp((alpha - 1.0) * Math.log(x * rate) - x * rate - logGamma(alpha));
   }
 
   public String toString() {
     return this.getClass().getName() + '(' + rate + ',' + alpha + ')';
   }
+
+  /** Returns a quick approximation of <tt>log(gamma(x))</tt>. */
+  public static double logGamma(double x) {
+
+    if (x <= 0.0 /* || x > 1.3e19 */) {
+      return -999;
+    }
+
+    double z;
+    for (z = 1.0; x < 11.0; x++) {
+      z *= x;
+    }
+
+    double r = 1.0 / (x * x);
+    double c6 = -1.9175269175269175e-03;
+    double c5 = 8.4175084175084175e-04;
+    double c4 = -5.9523809523809524e-04;
+    double c3 = 7.9365079365079365e-04;
+    double c2 = -2.7777777777777777e-03;
+    double c1 = 8.3333333333333333e-02;
+    double g = c1 + r * (c2 + r * (c3 + r * (c4 + r * (c5 + r + c6))));
+    double c0 = 9.1893853320467274e-01;
+    g = (x - 0.5) * Math.log(x) - x + c0 + g / x;
+    if (z == 1.0) {
+      return g;
+    }
+    return g - Math.log(z);
+  }
+
 }

@@ -27,6 +27,7 @@ import org.apache.mahout.cf.taste.impl.recommender.TopItems;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
 import org.apache.mahout.cf.taste.recommender.CandidateItemsStrategy;
+import org.apache.mahout.cf.taste.recommender.MostSimilarItemsCandidateItemsStrategy;
 import org.apache.mahout.cf.taste.recommender.RecommendedItem;
 import org.apache.mahout.cf.taste.recommender.Rescorer;
 import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
@@ -47,8 +48,9 @@ public final class KnnItemBasedRecommender extends GenericItemBasedRecommender {
                                  ItemSimilarity similarity,
                                  Optimizer optimizer,
                                  CandidateItemsStrategy candidateItemsStrategy,
+                                 MostSimilarItemsCandidateItemsStrategy mostSimilarItemsCandidateItemsStrategy,
                                  int neighborhoodSize) {
-    super(dataModel, similarity, candidateItemsStrategy);
+    super(dataModel, similarity, candidateItemsStrategy, mostSimilarItemsCandidateItemsStrategy);
     this.optimizer = optimizer;
     this.neighborhoodSize = neighborhoodSize;
   }
@@ -57,7 +59,8 @@ public final class KnnItemBasedRecommender extends GenericItemBasedRecommender {
                                  ItemSimilarity similarity,
                                  Optimizer optimizer,
                                  int neighborhoodSize) {
-    this(dataModel, similarity, optimizer, getDefaultCandidateItemsStrategy(), neighborhoodSize);
+    this(dataModel, similarity, optimizer, getDefaultCandidateItemsStrategy(),
+        getDefaultMostSimilarItemsCandidateItemsStrategy(), neighborhoodSize);
   }
   
   private List<RecommendedItem> mostSimilarItems(long itemID,
@@ -123,14 +126,14 @@ public final class KnnItemBasedRecommender extends GenericItemBasedRecommender {
   }
   
   @Override
-  protected float doEstimatePreference(long theUserID, long itemID) throws TasteException {
+  protected float doEstimatePreference(long theUserID, PreferenceArray preferencesFromUser, long itemID)
+    throws TasteException {
     
     DataModel dataModel = getDataModel();
-    PreferenceArray prefs = dataModel.getPreferencesFromUser(theUserID);
-    int size = prefs.length();
+    int size = preferencesFromUser.length();
     FastIDSet possibleItemIDs = new FastIDSet(size);
     for (int i = 0; i < size; i++) {
-      possibleItemIDs.add(prefs.getItemID(i));
+      possibleItemIDs.add(preferencesFromUser.getItemID(i));
     }
     possibleItemIDs.remove(itemID);
     

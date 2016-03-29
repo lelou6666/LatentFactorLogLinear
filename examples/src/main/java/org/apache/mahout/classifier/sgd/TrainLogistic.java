@@ -17,6 +17,7 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import org.apache.commons.cli2.CommandLine;
@@ -31,13 +32,16 @@ import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.Vector;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.List;
+import java.util.Locale;
 
 
 /**
@@ -52,6 +56,7 @@ public final class TrainLogistic {
   private static int passes;
   private static boolean scores;
   private static OnlineLogisticRegression model;
+  static PrintStream output = System.out;
 
   private TrainLogistic() {
   }
@@ -87,8 +92,8 @@ public final class TrainLogistic {
           }
           double p = lr.classifyScalar(input);
           if (scores) {
-            System.out.printf("%10d %2d %10.2f %2.4f %10.4f %10.4f\n",
-                samples, targetValue, lr.currentLearningRate(), p, logP, logPEstimate);
+            output.printf(Locale.ENGLISH, "%10d %2d %10.2f %2.4f %10.4f %10.4f\n",
+              samples, targetValue, lr.currentLearningRate(), p, logP, logPEstimate);
           }
 
           // now update model
@@ -99,36 +104,36 @@ public final class TrainLogistic {
         in.close();
       }
 
-      OutputStreamWriter modelOutput = new FileWriter(outputFile);
+      OutputStream modelOutput = new FileOutputStream(outputFile);
       try {
         lmp.saveTo(modelOutput);
       } finally {
         modelOutput.close();
       }
       
-      System.out.printf("%d\n", lmp.getNumFeatures());
-      System.out.printf("%s ~ ", lmp.getTargetVariable());
+      output.printf(Locale.ENGLISH, "%d\n", lmp.getNumFeatures());
+      output.printf(Locale.ENGLISH, "%s ~ ", lmp.getTargetVariable());
       String sep = "";
-      for (String v : csv.getPredictors()) {
+      for (String v : csv.getTraceDictionary().keySet()) {
         double weight = predictorWeight(lr, 0, csv, v);
         if (weight != 0) {
-          System.out.printf("%s%.3f*%s", sep, weight, v);
+          output.printf(Locale.ENGLISH, "%s%.3f*%s", sep, weight, v);
           sep = " + ";
         }
       }
-      System.out.printf("\n");
+      output.printf("\n");
       model = lr;
       for (int row = 0; row < lr.getBeta().numRows(); row++) {
         for (String key : csv.getTraceDictionary().keySet()) {
           double weight = predictorWeight(lr, row, csv, key);
           if (weight != 0) {
-            System.out.printf("%20s %.5f\n", key, weight);
+            output.printf(Locale.ENGLISH, "%20s %.5f\n", key, weight);
           }
         }
         for (int column = 0; column < lr.getBeta().numCols(); column++) {
-          System.out.printf("%15.9f ", lr.getBeta().get(row, column));
+          output.printf(Locale.ENGLISH, "%15.9f ", lr.getBeta().get(row, column));
         }
-        System.out.println();
+        output.println();
       }
     }
   }
@@ -297,13 +302,12 @@ public final class TrainLogistic {
   }
 
   static BufferedReader open(String inputFile) throws IOException {
-    InputStreamReader s;
+    InputStream in;
     try {
-      URL resource = Resources.getResource(inputFile);
-      s = new InputStreamReader(resource.openStream());
+      in = Resources.getResource(inputFile).openStream();
     } catch (IllegalArgumentException e) {
-      s = new FileReader(inputFile);
+      in = new FileInputStream(new File(inputFile));
     }
-    return new BufferedReader(s);
+    return new BufferedReader(new InputStreamReader(in, Charsets.UTF_8));
   }
 }

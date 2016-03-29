@@ -22,9 +22,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
@@ -64,12 +62,20 @@ public final class VectorWritableTest extends MahoutTestCase {
 
   private static void writeAndRead(Writable toWrite, Writable toRead) throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    DataOutput dos = new DataOutputStream(baos);
-    toWrite.write(dos);
+    DataOutputStream dos = new DataOutputStream(baos);
+    try {
+      toWrite.write(dos);
+    } finally {
+      dos.close();
+    }
 
     ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-    DataInput dis = new DataInputStream(bais);
-    toRead.readFields(dis);
+    DataInputStream dis = new DataInputStream(bais);
+    try {
+      toRead.readFields(dis);
+    } finally {
+      dis.close();
+    }
   }
 
 

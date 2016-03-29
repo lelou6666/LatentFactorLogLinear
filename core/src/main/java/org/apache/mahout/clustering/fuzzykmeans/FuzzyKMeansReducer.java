@@ -19,8 +19,8 @@ package org.apache.mahout.clustering.fuzzykmeans;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -36,7 +36,8 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
   private FuzzyKMeansClusterer clusterer;
 
   @Override
-  protected void reduce(Text key, Iterable<ClusterObservations> values, Context context) throws IOException, InterruptedException {
+  protected void reduce(Text key, Iterable<ClusterObservations> values, Context context)
+    throws IOException, InterruptedException {
     SoftCluster cluster = clusterMap.get(key.toString());
     for (ClusterObservations value : values) {
       if (value.getCombinerState() == 0) { // escaped from combiner
@@ -50,6 +51,7 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
     if (converged) {
       context.getCounter("Clustering", "Converged Clusters").increment(1);
     }
+    cluster.computeParameters();
     context.write(new Text(cluster.getIdentifier()), cluster);
   }
 
@@ -59,7 +61,7 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
     Configuration conf = context.getConfiguration();
     clusterer = new FuzzyKMeansClusterer(conf);
 
-    List<SoftCluster> clusters = new ArrayList<SoftCluster>();
+    Collection<SoftCluster> clusters = new ArrayList<SoftCluster>();
     String clusterPath = conf.get(FuzzyKMeansConfigKeys.CLUSTER_PATH_KEY);
     if ((clusterPath != null) && (clusterPath.length() > 0)) {
       FuzzyKMeansUtil.configureWithClusterInfo(new Path(clusterPath), clusters);
@@ -71,7 +73,7 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
     }
   }
 
-  private void setClusterMap(List<SoftCluster> clusters) {
+  private void setClusterMap(Collection<SoftCluster> clusters) {
     clusterMap.clear();
     for (SoftCluster cluster : clusters) {
       clusterMap.put(cluster.getIdentifier(), cluster);
@@ -79,7 +81,7 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
     clusters.clear();
   }
 
-  public void setup(List<SoftCluster> clusters, Configuration conf) {
+  public void setup(Collection<SoftCluster> clusters, Configuration conf) {
     setClusterMap(clusters);
     clusterer = new FuzzyKMeansClusterer(conf);
   }

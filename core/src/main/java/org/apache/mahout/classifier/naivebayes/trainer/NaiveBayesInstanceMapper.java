@@ -22,52 +22,43 @@ import java.net.URI;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.math.map.OpenObjectIntHashMap;
 
 public class NaiveBayesInstanceMapper extends Mapper<Text, VectorWritable, IntWritable, VectorWritable> {
   
-  private OpenObjectIntHashMap<String> labelMap = new OpenObjectIntHashMap<String>();
+  private final OpenObjectIntHashMap<String> labelMap = new OpenObjectIntHashMap<String>();
   
   @Override
-  protected void map(Text key, VectorWritable value, Context context)
-      throws IOException, InterruptedException {
-    if (!labelMap.containsKey(key.toString())) {
+  protected void map(Text key, VectorWritable value, Context context) throws IOException, InterruptedException {
+    if (labelMap.containsKey(key.toString())) {
+      int label = labelMap.get(key.toString());
+      context.write(new IntWritable(label), value);
+    } else {
       context.getCounter("NaiveBayes", "Skipped instance: not in label list").increment(1);
-      return;
-    }  
-    int label = labelMap.get(key.toString());
-    context.write(new IntWritable(label), value);
+    }
   }
   
   @Override
   protected void setup(Context context) throws IOException, InterruptedException {
     super.setup(context);
     Configuration conf = context.getConfiguration();
-    try {
-      URI[] localFiles = DistributedCache.getCacheFiles(conf);
-      if (localFiles == null || localFiles.length < 1) {
-        throw new IllegalArgumentException("missing paths from the DistributedCache");
-      }
-      Path labelMapFile = new Path(localFiles[0].getPath());
-      FileSystem fs = labelMapFile.getFileSystem(conf);
-      SequenceFile.Reader reader = new SequenceFile.Reader(fs, labelMapFile, conf);
-      Writable key = new Text();
-      IntWritable value = new IntWritable();
-
-      // key is word value is id
-      while (reader.next(key, value)) {
-        labelMap.put(key.toString(), value.get());
-      }
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
+    URI[] localFiles = DistributedCache.getCacheFiles(conf);
+    if (localFiles == null || localFiles.length < 1) {
+      throw new IllegalArgumentException("missing paths from the DistributedCache");
+    }
+    Path labelMapFile = new Path(localFiles[0].getPath());
+    // key is word value is id
+    for (Pair<Writable,IntWritable> record
+         : new SequenceFileIterable<Writable,IntWritable>(labelMapFile, true, conf)) {
+      labelMap.put(record.getFirst().toString(), record.getSecond().get());
     }
   }
 }

@@ -22,7 +22,6 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -43,9 +42,9 @@ public final class AffinityMatrixInputJob {
    */
   public static void runJob(Path input, Path output, int rows, int cols)
     throws IOException, InterruptedException, ClassNotFoundException {
-    HadoopUtil.overwriteOutput(output);
-
     Configuration conf = new Configuration();
+    HadoopUtil.delete(conf, output);
+
     conf.setInt(EigencutsKeys.AFFINITY_DIMENSIONS, rows);
     Job job = new Job(conf, "AffinityMatrixInputJob: " + input + " -> M/R -> " + output);
 
@@ -72,10 +71,10 @@ public final class AffinityMatrixInputJob {
     throws IOException, InterruptedException, ClassNotFoundException {
     Path seqFiles = new Path(output, "seqfiles-" + (System.nanoTime() & 0xFF));
     runJob(input, seqFiles, dimensions, dimensions);
-    DistributedRowMatrix A = new DistributedRowMatrix(seqFiles, 
+    DistributedRowMatrix a = new DistributedRowMatrix(seqFiles,
         new Path(seqFiles, "seqtmp-" + (System.nanoTime() & 0xFF)), 
         dimensions, dimensions);
-    A.configure(new JobConf());
-    return A;
+    a.setConf(new Configuration());
+    return a;
   }
 }

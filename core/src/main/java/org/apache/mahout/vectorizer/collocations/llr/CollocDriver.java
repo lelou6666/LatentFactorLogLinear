@@ -106,7 +106,7 @@ public final class CollocDriver extends AbstractJob {
     log.info("Maximum n-gram size is: {}", maxNGramSize);
 
     if (argMap.containsKey("--overwrite")) {
-      HadoopUtil.overwriteOutput(output);
+      HadoopUtil.delete(getConf(), output);
     }
 
     int minSupport = CollocReducer.DEFAULT_MIN_SUPPORT;
@@ -143,7 +143,7 @@ public final class CollocDriver extends AbstractJob {
 
       Path tokenizedPath = new Path(output, DocumentProcessor.TOKENIZED_DOCUMENT_OUTPUT_FOLDER);
 
-      DocumentProcessor.tokenizeDocuments(input, analyzerClass, tokenizedPath);
+      DocumentProcessor.tokenizeDocuments(input, analyzerClass, tokenizedPath, getConf());
       input = tokenizedPath;
     } else {
       log.info("Input will NOT be preprocessed");
@@ -160,12 +160,14 @@ public final class CollocDriver extends AbstractJob {
   }
 
   /**
-   * Generate all ngrams for the {@link org.apache.mahout.utils.vectors.text.DictionaryVectorizer} job
+   * Generate all ngrams for the {@link org.apache.mahout.vectorizer.DictionaryVectorizer} job
    * 
    * @param input
    *          input path containing tokenized documents
    * @param output
    *          output path where ngrams are generated including unigrams
+   * @param baseConf
+   *          job configuration
    * @param maxNGramSize
    *          minValue = 2.
    * @param minSupport
@@ -200,7 +202,7 @@ public final class CollocDriver extends AbstractJob {
                                            int maxNGramSize,
                                            int reduceTasks,
                                            int minSupport)
-      throws IOException, ClassNotFoundException, InterruptedException {
+    throws IOException, ClassNotFoundException, InterruptedException {
 
     Configuration con = new Configuration(baseConf);
     con.setBoolean(EMIT_UNIGRAMS, emitUnigrams);
@@ -247,11 +249,12 @@ public final class CollocDriver extends AbstractJob {
                                               boolean emitUnigrams,
                                               float minLLRValue,
                                               int reduceTasks)
-      throws IOException, InterruptedException, ClassNotFoundException {
+    throws IOException, InterruptedException, ClassNotFoundException {
     Configuration conf = new Configuration(baseConf);
     conf.setLong(LLRReducer.NGRAM_TOTAL, nGramTotal);
     conf.setBoolean(EMIT_UNIGRAMS, emitUnigrams);
- 
+    conf.setFloat(LLRReducer.MIN_LLR, minLLRValue);
+
     Job job = new Job(conf);
     job.setJobName(CollocDriver.class.getSimpleName() + ".computeNGrams: " + output);
     job.setJarByClass(CollocDriver.class);
@@ -272,7 +275,6 @@ public final class CollocDriver extends AbstractJob {
     job.setReducerClass(LLRReducer.class);
     job.setNumReduceTasks(reduceTasks);
 
-    conf.setFloat(LLRReducer.MIN_LLR, minLLRValue);
     job.waitForCompletion(true);
   }
 }

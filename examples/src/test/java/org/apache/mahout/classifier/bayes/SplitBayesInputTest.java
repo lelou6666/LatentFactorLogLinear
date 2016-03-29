@@ -18,13 +18,12 @@
 package org.apache.mahout.classifier.bayes;
 
 import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 
+import com.google.common.base.Charsets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -40,7 +39,6 @@ public final class SplitBayesInputTest extends MahoutTestCase {
   private OpenObjectIntHashMap<String> countMap;
   private Charset charset;
   private FileSystem fs;
-  private Configuration conf;
   private Path tempInputFile;
   private Path tempTrainingDirectory;
   private Path tempTestDirectory;
@@ -50,14 +48,14 @@ public final class SplitBayesInputTest extends MahoutTestCase {
   @Override
   @Before
   public void setUp() throws Exception {
-    conf = new Configuration();
+    Configuration conf = new Configuration();
     fs   = FileSystem.get(conf);
     
     super.setUp();
   
     countMap = new OpenObjectIntHashMap<String>();
     
-    charset = Charset.forName("UTF-8");
+    charset = Charsets.UTF_8;
     tempInputFile = getTestTempFilePath("bayesinputfile");
     tempTrainingDirectory = getTestTempDirPath("bayestrain");
     tempTestDirectory = getTestTempDirPath("bayestest");
@@ -82,7 +80,7 @@ public final class SplitBayesInputTest extends MahoutTestCase {
         
         writer = new BufferedWriter(
             new OutputStreamWriter(
-                fs.create(new Path(tempInputDirectory, currentLabel)), Charset.forName("UTF-8")));
+                fs.create(new Path(tempInputDirectory, currentLabel)), Charsets.UTF_8));
       }
       countMap.adjustOrPutValue(currentLabel, 1, 1);
       writer.write(currentLabel + '\t' + entry[1] + '\n');
@@ -92,7 +90,7 @@ public final class SplitBayesInputTest extends MahoutTestCase {
 
   private void writeSingleInputFile() throws IOException {
     BufferedWriter writer = new BufferedWriter(
-        new OutputStreamWriter(fs.create(tempInputFile), Charset.forName("UTF-8")));
+        new OutputStreamWriter(fs.create(tempInputFile), Charsets.UTF_8));
     for (String[] entry : ClassifierData.DATA) {
       writer.write(entry[0] + '\t' + entry[1] + '\n');
     }
