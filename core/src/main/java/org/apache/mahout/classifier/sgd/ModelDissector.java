@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import org.apache.mahout.classifier.AbstractVectorClassifier;
+import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.math.Vector;
 
 import java.util.Collections;
@@ -64,7 +65,8 @@ public class ModelDissector {
    * 1 and then look at the resulting score.  This tells us the weight the model places
    * on that variable.
    * @param features               A feature vector to use (destructively)
-   * @param traceDictionary        A trace dictionary containing variables and what locations in the feature vector are affected by them
+   * @param traceDictionary        A trace dictionary containing variables and what locations
+   *                               in the feature vector are affected by them
    * @param learner                The model that we are probing to find weights on features
    */
 
@@ -115,7 +117,7 @@ public class ModelDissector {
     return r;
   }
 
-  private static class Category implements Comparable<Category> {
+  private static final class Category implements Comparable<Category> {
     private final int index;
     private final double weight;
 
@@ -128,16 +130,30 @@ public class ModelDissector {
     public int compareTo(Category o) {
       int r = Double.compare(Math.abs(weight), Math.abs(o.weight));
       if (r == 0) {
-        if (index < o.index) {
+        if (o.index < index) {
           return -1;
-        } else if (index > o.index) {
+        } else if (o.index > index) {
           return 1;
         }
         return 0;
-      } else {
-        return r;
       }
+      return r;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Category)) {
+        return false;
+      }
+      Category other = (Category) o;
+      return index == other.index && weight == other.weight;
+    }
+
+    @Override
+    public int hashCode() {
+      return RandomUtils.hashDouble(weight) ^ index;
+    }
+
   }
 
   public static class Weight implements Comparable<Weight> {
@@ -153,7 +169,7 @@ public class ModelDissector {
     public Weight(String feature, Vector weights, int n) {
       this.feature = feature;
       // pick out the weight with the largest abs value, but don't forget the sign
-      Queue<Category> biggest = new PriorityQueue<Category>(n + 1, Ordering.natural().reverse());
+      Queue<Category> biggest = new PriorityQueue<Category>(n + 1, Ordering.natural());
       for (Vector.Element element : weights) {
         biggest.add(new Category(element.index(), element.get()));
         while (biggest.size() > n) {
@@ -171,9 +187,25 @@ public class ModelDissector {
       int r = Double.compare(Math.abs(this.value), Math.abs(other.value));
       if (r == 0) {
         return feature.compareTo(other.feature);
-      } else {
-        return r;
       }
+      return r;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Weight)) {
+        return false;
+      }
+      Weight other = (Weight) o;
+      return feature.equals(other.feature)
+          && value == other.value
+          && maxIndex == other.maxIndex
+          && categories.equals(other.categories);
+    }
+
+    @Override
+    public int hashCode() {
+      return feature.hashCode() ^ RandomUtils.hashDouble(value) ^ maxIndex ^ categories.hashCode();
     }
 
     public String getFeature() {
@@ -188,7 +220,7 @@ public class ModelDissector {
       return categories.get(n).weight;
     }
 
-    public double getCategory(int n) {
+    public int getCategory(int n) {
       return categories.get(n).index;
     }
 

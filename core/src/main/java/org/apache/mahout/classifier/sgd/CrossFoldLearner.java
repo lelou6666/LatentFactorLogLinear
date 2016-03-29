@@ -47,7 +47,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   private static final double MIN_SCORE = 1.0e-50;
   private OnlineAuc auc = new GlobalOnlineAuc();
   private double logLikelihood;
-  private final List<OnlineLogisticRegression> models = Lists.newArrayList();
+  private final List<AdjustableOnlineLearner> models = Lists.newArrayList();
 
   // lambda, learningRate, perTermOffset, perTermExponent
   private double[] parameters = new double[4];
@@ -57,7 +57,6 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
 
   private int windowSize = Integer.MAX_VALUE;
 
-  // pretty much just for GSON
   public CrossFoldLearner() {
   }
 
@@ -74,35 +73,35 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   // -------- builder-like configuration methods
 
   public CrossFoldLearner lambda(double v) {
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.lambda(v);
     }
     return this;
   }
 
   public CrossFoldLearner learningRate(double x) {
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.learningRate(x);
     }
     return this;
   }
 
   public CrossFoldLearner stepOffset(int x) {
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.stepOffset(x);
     }
     return this;
   }
 
   public CrossFoldLearner decayExponent(double x) {
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.decayExponent(x);
     }
     return this;
   }
 
   public CrossFoldLearner alpha(double alpha) {
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.alpha(alpha);
     }
     return this;
@@ -123,7 +122,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   public void train(long trackingKey, String groupKey, int actual, Vector instance) {
     record++;
     int k = 0;
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       if (k == trackingKey % models.size()) {
         Vector v = model.classifyFull(instance);
         double score = Math.max(v.get(actual), MIN_SCORE);
@@ -143,7 +142,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
 
   @Override
   public void close() {
-    for (OnlineLogisticRegression m : models) {
+    for (AdjustableOnlineLearner m : models) {
       m.close();
     }
   }
@@ -154,7 +153,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
 
   public boolean validModel() {
     boolean r = true;
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       r &= model.validModel();
     }
     return r;
@@ -166,7 +165,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   public Vector classify(Vector instance) {
     Vector r = new DenseVector(numCategories() - 1);
     DoubleDoubleFunction scale = Functions.plusMult(1.0 / models.size());
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       r.assign(model.classify(instance), scale);
     }
     return r;
@@ -176,7 +175,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   public Vector classifyNoLink(Vector instance) {
     Vector r = new DenseVector(numCategories() - 1);
     DoubleDoubleFunction scale = Functions.plusMult(1.0 / models.size());
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       r.assign(model.classifyNoLink(instance), scale);
     }
     return r;
@@ -186,7 +185,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   public double classifyScalar(Vector instance) {
     double r = 0;
     int n = 0;
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       n++;
       r += model.classifyScalar(instance);
     }
@@ -217,9 +216,9 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
   public CrossFoldLearner copy() {
     CrossFoldLearner r = new CrossFoldLearner(models.size(), numCategories(), numFeatures, prior);
     r.models.clear();
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.close();
-      OnlineLogisticRegression newModel = new OnlineLogisticRegression(model.numCategories(), model.numFeatures(), model.prior);
+      AdjustableOnlineLearner newModel = new OnlineLogisticRegression(model.numCategories(), model.numFeatures(), model.getPrior());
       newModel.copyFrom(model);
       r.models.add(newModel);
     }
@@ -250,7 +249,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
     this.logLikelihood = logLikelihood;
   }
 
-  public List<OnlineLogisticRegression> getModels() {
+  public List<AdjustableOnlineLearner> getModels() {
     return models;
   }
 
@@ -293,7 +292,7 @@ public class CrossFoldLearner extends AbstractVectorClassifier implements Online
     PolymorphicWritable.write(out, auc);
     out.writeDouble(logLikelihood);
     out.writeInt(models.size());
-    for (OnlineLogisticRegression model : models) {
+    for (AdjustableOnlineLearner model : models) {
       model.write(out);
     }
 

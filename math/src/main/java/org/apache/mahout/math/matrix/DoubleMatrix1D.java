@@ -8,10 +8,12 @@ It is provided "as is" without expressed or implied warranty.
 */
 package org.apache.mahout.math.matrix;
 
+import org.apache.mahout.math.DenseVector;
+import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.function.DoubleDoubleFunction;
+import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.function.Functions;
 import org.apache.mahout.math.function.PlusMult;
-import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.list.DoubleArrayList;
 import org.apache.mahout.math.list.IntArrayList;
 import org.apache.mahout.math.matrix.impl.AbstractMatrix1D;
@@ -169,6 +171,14 @@ public abstract class DoubleMatrix1D extends AbstractMatrix1D implements Cloneab
     return this;
   }
 
+  public Vector toVector() {
+    Vector vector = new DenseVector(cardinality());
+    for (int i = 0; i < cardinality(); i++) {
+      vector.set(i, get(i));
+    }
+    return vector;
+  }
+
   /**
    * Assigns the result of a function to each cell; <tt>x[i] = function(x[i],y[i])</tt>. <p> <b>Example:</b>
    * <pre>
@@ -240,14 +250,14 @@ public abstract class DoubleMatrix1D extends AbstractMatrix1D implements Cloneab
       }
     } else if (function instanceof PlusMult) {
       double multiplicator = ((PlusMult) function).getMultiplicator();
-      if (multiplicator == 0) { // x[i] = x[i] + 0*y[i]
+      if (multiplicator == 0.0) { // x[i] = x[i] + 0*y[i]
         // do nothing
-      } else if (multiplicator == 1) { // x[i] = x[i] + y[i]
+      } else if (multiplicator == 1.0) { // x[i] = x[i] + y[i]
         for (int index = nonZeroIndexes.size(); --index >= 0;) {
           int i = nonZeroElements[index];
           setQuick(i, getQuick(i) + y.getQuick(i));
         }
-      } else if (multiplicator == -1) { // x[i] = x[i] - y[i]
+      } else if (multiplicator == -1.0) { // x[i] = x[i] - y[i]
         for (int index = nonZeroIndexes.size(); --index >= 0;) {
           int i = nonZeroElements[index];
           setQuick(i, getQuick(i) - y.getQuick(i));

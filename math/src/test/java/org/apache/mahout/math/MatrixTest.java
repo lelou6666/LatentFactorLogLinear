@@ -79,7 +79,7 @@ public abstract class MatrixTest extends MahoutTestCase {
     while(it.hasNext() && (m = it.next()) != null) {
       Vector v = m.vector();
       Vector w = test instanceof SparseColumnMatrix ? test.getColumn(m.index()) : test.getRow(m.index());
-      assertEquals("iterator: " + v.asFormatString() + ", randomAccess: " + w, v, w);
+      assertEquals("iterator: " + v + ", randomAccess: " + w, v, w);
     }
   }
 
@@ -294,6 +294,7 @@ public abstract class MatrixTest extends MahoutTestCase {
   @Test
   public void testAggregateRows() {
     Vector v = test.aggregateRows(new VectorFunction() {
+      @Override
       public double apply(Vector v) {
         return v.zSum();
       }
@@ -307,6 +308,7 @@ public abstract class MatrixTest extends MahoutTestCase {
   @Test
   public void testAggregateCols() {
     Vector v = test.aggregateColumns(new VectorFunction() {
+      @Override
       public double apply(Vector v) {
         return v.zSum();
       }
@@ -321,6 +323,7 @@ public abstract class MatrixTest extends MahoutTestCase {
   public void testAggregate() {
     double total = test.aggregate(Functions.PLUS, Functions.IDENTITY);
     assertEquals(test.aggregateRows(new VectorFunction() {
+      @Override
       public double apply(Vector v) {
         return v.zSum();
       }
@@ -463,8 +466,8 @@ public abstract class MatrixTest extends MahoutTestCase {
     for (int i = 0; i < expected.numCols(); i++) {
       for (int j = 0; j < expected.numRows(); j++) {
         assertTrue("Matrix times transpose not correct: " + i + ", " + j
-            + "\nexpected:\n\t" + expected.asFormatString() + "\nactual:\n\t"
-            + value.asFormatString(),
+            + "\nexpected:\n\t" + expected + "\nactual:\n\t"
+            + value,
             Math.abs(expected.get(i, j) - value.get(i, j)) < 1.0e-12);
       }
     }
@@ -479,8 +482,7 @@ public abstract class MatrixTest extends MahoutTestCase {
     Vector vectorA = new DenseVector(vectorAValues);
     Vector testTimesVectorA = test.times(vectorA);
     Vector expected = new DenseVector(new double[]{5.0, 11.0, 17.0});
-    assertTrue("Matrix times vector not equals: " + vectorA.asFormatString()
-        + " != " + testTimesVectorA.asFormatString(),
+    assertTrue("Matrix times vector not equals: " + vectorA + " != " + testTimesVectorA,
         expected.minus(testTimesVectorA).norm(2) < 1.0e-12);
     test.times(testTimesVectorA);
   }
@@ -490,8 +492,7 @@ public abstract class MatrixTest extends MahoutTestCase {
     Vector vectorA = new DenseVector(vectorAValues);
     Vector ttA = test.timesSquared(vectorA);
     Vector ttASlow = test.transpose().times(test.times(vectorA));
-    assertTrue("M'Mv != M.timesSquared(v): " + ttA.asFormatString()
-        + " != " + ttASlow.asFormatString(),
+    assertTrue("M'Mv != M.timesSquared(v): " + ttA + " != " + ttASlow,
         ttASlow.minus(ttA).norm(2) < 1.0e-12);
 
   }
@@ -592,19 +593,6 @@ public abstract class MatrixTest extends MahoutTestCase {
   }
 
   @Test
-  public void testAsFormatString() {
-    String string = test.asFormatString();
-    int[] cardinality = {values.length, values[0].length};
-    Matrix m = AbstractMatrix.decodeMatrix(string);
-    for (int row = 0; row < cardinality[ROW]; row++) {
-      for (int col = 0; col < cardinality[COL]; col++) {
-        assertEquals("m[" + row + ',' + col + ']', test.get(row, col), m.get(
-            row, col), EPSILON);
-      }
-    }
-  }
-
-  @Test
   public void testLabelBindings() {
     Matrix m = matrixFactory(new double[][]{{1, 3, 4}, {5, 2, 3},
         {1, 4, 2}});
@@ -661,8 +649,6 @@ public abstract class MatrixTest extends MahoutTestCase {
     colBindings.put("Bar", 1);
     colBindings.put("Baz", 2);
     m.setColumnLabelBindings(colBindings);
-    String json = m.asFormatString();
-    Matrix mm = AbstractMatrix.decodeMatrix(json);
-    assertEquals("Fee", m.get(0, 1), mm.get("Fee", "Bar"), EPSILON);
+    assertEquals("col", colBindings, m.getColumnLabelBindings());
   }
 }

@@ -20,25 +20,23 @@ package org.apache.mahout.clustering.dirichlet.models;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.util.Collection;
+import java.util.Collections;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.mahout.clustering.AbstractCluster;
 import org.apache.mahout.clustering.Cluster;
-import org.apache.mahout.clustering.JsonModelAdapter;
-import org.apache.mahout.clustering.Model;
 import org.apache.mahout.clustering.dirichlet.UncommonDistributions;
+import org.apache.mahout.common.parameters.Parameter;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 import org.apache.mahout.math.function.SquareRootFunction;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-
+/**
+ *
+ *@deprecated Use GaussianCluster instead
+ */
 public class AsymmetricSampledNormalModel implements Cluster {
-
-  private static final Type MODEL_TYPE = new TypeToken<Model<Vector>>() {
-  }.getType();
 
   private int id;
 
@@ -64,6 +62,21 @@ public class AsymmetricSampledNormalModel implements Cluster {
     this.s0 = 0;
     this.s1 = mean.like();
     this.s2 = mean.like();
+  }
+  
+  @Override
+  public void configure(Configuration job) {
+    // nothing to do
+  }
+  
+  @Override
+  public Collection<Parameter<?>> getParameters() {
+    return Collections.emptyList();
+  }
+  
+  @Override
+  public void createParameters(String prefix, Configuration jobConf) {
+    // nothing to do
   }
 
   public Vector getMean() {
@@ -128,7 +141,7 @@ public class AsymmetricSampledNormalModel implements Cluster {
   }
 
   @Override
-  public int count() {
+  public long count() {
     return s0;
   }
 
@@ -178,14 +191,6 @@ public class AsymmetricSampledNormalModel implements Cluster {
   }
 
   @Override
-  public String asJsonString() {
-    GsonBuilder builder = new GsonBuilder();
-    builder.registerTypeAdapter(Model.class, new JsonModelAdapter());
-    Gson gson = builder.create();
-    return gson.toJson(this, MODEL_TYPE);
-  }
-
-  @Override
   public Vector getCenter() {
     return mean;
   }
@@ -196,12 +201,17 @@ public class AsymmetricSampledNormalModel implements Cluster {
   }
 
   @Override
-  public int getNumPoints() {
+  public long getNumPoints() {
     return s0;
   }
 
   @Override
   public Vector getRadius() {
     return getStdDev();
+  }
+
+  @Override
+  public void observe(VectorWritable x, double weight) {
+   throw new UnsupportedOperationException();
   }
 }

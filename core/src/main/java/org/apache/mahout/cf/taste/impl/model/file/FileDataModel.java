@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -42,7 +41,7 @@ import org.apache.mahout.cf.taste.impl.model.GenericUserPreferenceArray;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
-import org.apache.mahout.common.FileLineIterator;
+import org.apache.mahout.common.iterator.FileLineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,6 +120,7 @@ public class FileDataModel extends AbstractDataModel {
 
   public static final long DEFAULT_MIN_RELOAD_INTERVAL_MS = 60 * 1000L; // 1 minute?
   private static final char COMMENT_CHAR = '#';
+  private static final char[] DELIMIETERS = {',', '\t'};
 
   private final File dataFile;
   private long lastModified;
@@ -151,7 +151,7 @@ public class FileDataModel extends AbstractDataModel {
    *          transposes user IDs and item IDs -- convenient for 'flipping' the data model this way
    * @param minReloadIntervalMS
    *  the minimum interval in milliseconds after which a full reload of the original datafile is done
-   * 	when refresh() is called
+   *  when refresh() is called
    * @see #FileDataModel(File)
    */
   public FileDataModel(File dataFile, boolean transpose, long minReloadIntervalMS) throws IOException {
@@ -309,11 +309,10 @@ public class FileDataModel extends AbstractDataModel {
   }
 
   public static char determineDelimiter(String line) {
-    if (line.indexOf(',') >= 0) {
-      return ',';
-    }
-    if (line.indexOf('\t') >= 0) {
-      return '\t';
+    for (char possibleDelimieter : DELIMIETERS) {
+      if (line.indexOf(possibleDelimieter) >= 0) {
+        return possibleDelimieter;
+      }
     }
     throw new IllegalArgumentException("Did not find a delimiter in first line");
   }
@@ -341,8 +340,8 @@ public class FileDataModel extends AbstractDataModel {
    * Reads one line from the input file and adds the data to a {@link FastByIDMap} data structure which maps user IDs
    * to preferences. This assumes that each line of the input file corresponds to one preference. After
    * reading a line and determining which user and item the preference pertains to, the method should look to
-   * see if the data contains a mapping for the user ID already, and if not, add an empty {@link List} of
-   * {@link Preference}s to the data.
+   * see if the data contains a mapping for the user ID already, and if not, add an empty data structure of preferences
+   * as appropriate to the data.
    * </p>
    *
    * <p>

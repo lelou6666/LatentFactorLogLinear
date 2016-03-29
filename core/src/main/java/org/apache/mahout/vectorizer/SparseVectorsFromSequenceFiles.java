@@ -27,7 +27,9 @@ import org.apache.commons.cli2.builder.GroupBuilder;
 import org.apache.commons.cli2.commandline.Parser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.mahout.common.AbstractJob;
 import org.apache.mahout.common.CommandLineUtil;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.vectorizer.collocations.llr.LLRReducer;
@@ -39,7 +41,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Converts a given set of sequence files into SparseVectors
  */
-public final class SparseVectorsFromSequenceFiles {
+public final class SparseVectorsFromSequenceFiles extends AbstractJob {
   
   private static final Logger log = LoggerFactory.getLogger(SparseVectorsFromSequenceFiles.class);
   
@@ -47,6 +49,11 @@ public final class SparseVectorsFromSequenceFiles {
   }
   
   public static void main(String[] args) throws Exception {
+    ToolRunner.run(new SparseVectorsFromSequenceFiles(), args);
+  }
+  
+  @Override
+  public int run(String[] args) throws Exception {
     DefaultOptionBuilder obuilder = new DefaultOptionBuilder();
     ArgumentBuilder abuilder = new ArgumentBuilder();
     GroupBuilder gbuilder = new GroupBuilder();
@@ -128,7 +135,8 @@ public final class SparseVectorsFromSequenceFiles {
         .withOption(chunkSizeOpt).withOption(outputDirOpt).withOption(inputDirOpt).withOption(minDFOpt)
         .withOption(maxDFPercentOpt).withOption(weightOpt).withOption(powerOpt).withOption(minLLROpt)
         .withOption(numReduceTasksOpt).withOption(maxNGramSizeOpt).withOption(overwriteOutput)
-        .withOption(helpOpt).withOption(sequentialAccessVectorOpt).withOption(namedVectorOpt).withOption(logNormalizeOpt)
+        .withOption(helpOpt).withOption(sequentialAccessVectorOpt).withOption(namedVectorOpt)
+        .withOption(logNormalizeOpt)
         .create();
     try {
       Parser parser = new Parser();
@@ -138,7 +146,7 @@ public final class SparseVectorsFromSequenceFiles {
       
       if (cmdLine.hasOption(helpOpt)) {
         CommandLineUtil.printHelp(group);
-        return;
+        return -1;
       }
       
       Path inputDir = new Path((String) cmdLine.getValue(inputDirOpt));
@@ -166,7 +174,7 @@ public final class SparseVectorsFromSequenceFiles {
       log.info("Maximum n-gram size is: {}", maxNGramSize);
       
       if (cmdLine.hasOption(overwriteOutput)) {
-        HadoopUtil.overwriteOutput(outputDir);
+        HadoopUtil.delete(getConf(), outputDir);
       }
       
       float minLLRValue = LLRReducer.DEFAULT_MIN_LLR;
@@ -228,10 +236,11 @@ public final class SparseVectorsFromSequenceFiles {
       if (cmdLine.hasOption(logNormalizeOpt)) {
         logNormalize = true;
       }
-      
-      HadoopUtil.overwriteOutput(outputDir);
+
+      Configuration conf = getConf();
+      HadoopUtil.delete(conf, outputDir);
       Path tokenizedPath = new Path(outputDir, DocumentProcessor.TOKENIZED_DOCUMENT_OUTPUT_FOLDER);
-      DocumentProcessor.tokenizeDocuments(inputDir, analyzerClass, tokenizedPath);
+      DocumentProcessor.tokenizeDocuments(inputDir, analyzerClass, tokenizedPath, conf);
       
       boolean sequentialAccessOutput = false;
       if (cmdLine.hasOption(sequentialAccessVectorOpt)) {
@@ -243,7 +252,6 @@ public final class SparseVectorsFromSequenceFiles {
         namedVectors = true;
       }
       
-      Configuration conf = new Configuration();
       if (!processIdf) {
         DictionaryVectorizer.createTermFrequencyVectors(tokenizedPath, outputDir, conf, minSupport, maxNGramSize,
           minLLRValue, norm, logNormalize, reduceTasks, chunkSize, sequentialAccessOutput, namedVectors);
@@ -253,13 +261,14 @@ public final class SparseVectorsFromSequenceFiles {
       
         TFIDFConverter.processTfIdf(
           new Path(outputDir, DictionaryVectorizer.DOCUMENT_VECTOR_OUTPUT_FOLDER),
-          outputDir, chunkSize, minDf, maxDFPercent, norm, logNormalize,
+          outputDir, conf, chunkSize, minDf, maxDFPercent, norm, logNormalize,
           sequentialAccessOutput, namedVectors, reduceTasks);
       }
     } catch (OptionException e) {
       log.error("Exception", e);
       CommandLineUtil.printHelp(group);
     }
+    return 0;
   }
   
 }

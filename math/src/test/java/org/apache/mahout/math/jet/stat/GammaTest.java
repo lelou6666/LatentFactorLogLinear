@@ -36,7 +36,9 @@ public final class GammaTest extends MahoutTestCase {
   @Test
   public void testGamma() {
     double[] x = {1, 2, 5, 10, 20, 50, 100};
-    double[] expected = {1.000000e+00, 1.000000e+00, 2.400000e+01, 3.628800e+05, 1.216451e+17, 6.082819e+62, 9.332622e+155};
+    double[] expected = {
+        1.000000e+00, 1.000000e+00, 2.400000e+01, 3.628800e+05, 1.216451e+17, 6.082819e+62, 9.332622e+155
+    };
 
     for (int i = 0; i < x.length; i++) {
       assertEquals(expected[i], Gamma.gamma(x[i]), expected[i] * 1.0e-5);
@@ -48,7 +50,9 @@ public final class GammaTest extends MahoutTestCase {
   @Test
   public void testNegativeArgForGamma() {
     double[] x = {-30.3, -20.7, -10.5, -1.1, 0.5, 0.99, -0.999};
-    double[] expected = {-5.243216e-33, -1.904051e-19, -2.640122e-07, 9.714806e+00, 1.772454e+00, 1.005872e+00, -1.000424e+03};
+    double[] expected = {
+        -5.243216e-33, -1.904051e-19, -2.640122e-07, 9.714806e+00, 1.772454e+00, 1.005872e+00, -1.000424e+03
+    };
 
     for (int i = 0; i < x.length; i++) {
       assertEquals(expected[i], Gamma.gamma(x[i]), Math.abs(expected[i] * 1.0e-5));

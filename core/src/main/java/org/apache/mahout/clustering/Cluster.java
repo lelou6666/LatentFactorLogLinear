@@ -15,6 +15,7 @@
  */
 package org.apache.mahout.clustering;
 
+import org.apache.mahout.common.parameters.Parametered;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 
@@ -23,7 +24,7 @@ import org.apache.mahout.math.VectorWritable;
  * attributes that are common across all clustering implementations
  * 
  */
-public interface Cluster extends Model<VectorWritable> {
+public interface Cluster extends Model<VectorWritable>, Parametered {
   
   // default directory for all clustered points
   String CLUSTERED_POINTS_DIR = "clusteredPoints";
@@ -60,24 +61,16 @@ public interface Cluster extends Model<VectorWritable> {
    * Get an integer denoting the number of points observed by this cluster
    * @return an integer 
    */
-  int getNumPoints();
-
+  long getNumPoints();
+  
   /**
    * Produce a custom, human-friendly, printable representation of the Cluster.
-   * 
+   *
    * @param bindings
    *          an optional String[] containing labels used to format the primary Vector/s of this
    *          implementation.
    * @return a String
    */
   String asFormatString(String[] bindings);
-  
-  /**
-   * Produce a textual representation of the Cluster using Json format. (Label bindings are transient and not part
-   * of the Json representation)
-   * 
-   * @return a Json String
-   */
-  String asJsonString();
-  
+
 }

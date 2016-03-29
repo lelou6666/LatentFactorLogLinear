@@ -79,6 +79,10 @@ public final class LogLikelihoodTest extends MahoutTestCase {
     // this will have lots of little positive values and a few big ones
     Vector p1 = new DenseVector(25)
       .assign(new DoubleFunction() {
+<<<<<<< HEAD
+=======
+        @Override
+>>>>>>> refs/remotes/tdunning/lll
         public double apply(double arg1) {
           return -Math.log(1 - rand.nextDouble());
         }
@@ -114,6 +118,7 @@ public final class LogLikelihoodTest extends MahoutTestCase {
     // comparing frequencies, we should be able to find 8 items with score > 0
     List<LogLikelihood.ScoredItem<Integer>> r = LogLikelihood.compareFrequencies(w1, w2, 8, 0);
     assertTrue(r.size() <= 8);
+<<<<<<< HEAD
     assertTrue(r.size() > 0);
     for (LogLikelihood.ScoredItem<Integer> item : r) {
       assertTrue(item.score >= 0);
@@ -127,6 +132,21 @@ public final class LogLikelihoodTest extends MahoutTestCase {
     for (LogLikelihood.ScoredItem<Integer> item : r) {
       assertTrue(item.score <= lastScore);
       lastScore = item.score;
+=======
+    assertFalse(r.isEmpty());
+    for (LogLikelihood.ScoredItem<Integer> item : r) {
+      assertTrue(item.getScore() >= 0);
+    }
+
+    // the most impressive should be 7
+    assertEquals(7, (int) r.get(0).getItem());
+
+    // make sure scores are descending
+    double lastScore = r.get(0).getScore();
+    for (LogLikelihood.ScoredItem<Integer> item : r) {
+      assertTrue(item.getScore() <= lastScore);
+      lastScore = item.getScore();
+>>>>>>> refs/remotes/tdunning/lll
     }
 
     // now as many as have score >= 1
@@ -134,14 +154,24 @@ public final class LogLikelihoodTest extends MahoutTestCase {
 
     // only the boosted items should make the cut
     assertEquals(3, r.size());
+<<<<<<< HEAD
     assertEquals(7, (int) r.get(0).item);
     assertEquals(5, (int) r.get(1).item);
     assertEquals(6, (int) r.get(2).item);
+=======
+    assertEquals(7, (int) r.get(0).getItem());
+    assertEquals(5, (int) r.get(1).getItem());
+    assertEquals(6, (int) r.get(2).getItem());
+>>>>>>> refs/remotes/tdunning/lll
 
     r = LogLikelihood.compareFrequencies(w1, w2, 1000, -100);
     Multiset<Integer> k = HashMultiset.create();
     for (LogLikelihood.ScoredItem<Integer> item : r) {
+<<<<<<< HEAD
       k.add(item.item);
+=======
+      k.add(item.getItem());
+>>>>>>> refs/remotes/tdunning/lll
     }
     for (int i = 0; i < 25; i++) {
       assertTrue("i = " + i, k.count(i) == 1 || w2.count(i) == 0);
@@ -149,6 +179,7 @@ public final class LogLikelihoodTest extends MahoutTestCase {
 
     // all values that had non-zero counts in larger set should have result scores
     assertEquals(w2.elementSet().size(), r.size());
+<<<<<<< HEAD
     assertEquals(7, (int) r.get(0).item);
     assertEquals(5, (int) r.get(1).item);
     assertEquals(6, (int) r.get(2).item);
@@ -161,6 +192,20 @@ public final class LogLikelihoodTest extends MahoutTestCase {
     for (LogLikelihood.ScoredItem<Integer> item : r) {
       assertTrue(item.score <= lastScore);
       lastScore = item.score;
+=======
+    assertEquals(7, (int) r.get(0).getItem());
+    assertEquals(5, (int) r.get(1).getItem());
+    assertEquals(6, (int) r.get(2).getItem());
+    
+    // the last item should definitely have negative score
+    assertTrue(r.get(r.size() - 1).getScore() < 0);
+
+    // make sure scores are descending
+    lastScore = r.get(0).getScore();
+    for (LogLikelihood.ScoredItem<Integer> item : r) {
+      assertTrue(item.getScore() <= lastScore);
+      lastScore = item.getScore();
+>>>>>>> refs/remotes/tdunning/lll
     }
   }
 
@@ -170,7 +215,11 @@ public final class LogLikelihoodTest extends MahoutTestCase {
    * @param rand   A random number generator.
    * @return  A single sample from the multinomial distribution.
    */
+<<<<<<< HEAD
   private int sample(Vector p, Random rand) {
+=======
+  private static int sample(Vector p, Random rand) {
+>>>>>>> refs/remotes/tdunning/lll
     double u = rand.nextDouble();
 
     // simple sequential algorithm.  Not the fastest, but we don't care

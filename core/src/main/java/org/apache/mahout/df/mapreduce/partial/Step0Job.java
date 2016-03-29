@@ -28,13 +28,11 @@ import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -42,7 +40,10 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.mahout.df.DFUtils;
+import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,37 +124,25 @@ public class Step0Job {
    * Extracts the output and processes it
    * 
    * @return info for each partition in Hadoop's order
-   * @throws IOException
    */
   protected Step0Output[] parseOutput(JobContext job) throws IOException {
     Configuration conf = job.getConfiguration();
     
     log.info("mapred.map.tasks = {}", conf.getInt("mapred.map.tasks", -1));
-    
-    FileSystem fs = outputPath.getFileSystem(conf);
-    
-    Path[] outfiles = DFUtils.listOutputFiles(fs, outputPath);
-    
+
     List<Integer> keys = new ArrayList<Integer>();
     List<Step0Output> values = new ArrayList<Step0Output>();
-    
+
     // read all the outputs
-    IntWritable key = new IntWritable();
-    Step0Output value = new Step0Output(0L, 0);
-    
-    for (Path path : outfiles) {
-      Reader reader = new Reader(fs, path, conf);
-      
-      try {
-        while (reader.next(key, value)) {
-          keys.add(key.get());
-          values.add(value.clone());
-        }
-      } finally {
-        reader.close();
-      }
+    for (Pair<IntWritable,Step0Output> record
+         : new SequenceFileDirIterable<IntWritable,Step0Output>(outputPath,
+                                                                PathType.LIST,
+                                                                PathFilters.logsCRCFilter(), 
+                                                                conf)) {
+      keys.add(record.getFirst().get());
+      values.add(record.getSecond());
     }
-    
+
     return processOutput(keys, values);
   }
   
@@ -248,6 +237,8 @@ public class Step0Job {
     
     /** number of instances in the partition */
     private int size;
+
+    protected Step0Output() { }
     
     protected Step0Output(long firstId, int size) {
       this.firstId = firstId;

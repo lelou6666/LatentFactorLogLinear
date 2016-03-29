@@ -24,16 +24,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
 import org.apache.mahout.clustering.canopy.Canopy;
 import org.apache.mahout.clustering.canopy.CanopyDriver;
 import org.apache.mahout.clustering.dirichlet.DirichletDriver;
 import org.apache.mahout.clustering.dirichlet.UncommonDistributions;
+import org.apache.mahout.clustering.dirichlet.models.DistributionDescription;
 import org.apache.mahout.clustering.dirichlet.models.GaussianClusterDistribution;
 import org.apache.mahout.clustering.evaluation.ClusterEvaluator;
 import org.apache.mahout.clustering.evaluation.RepresentativePointsDriver;
@@ -43,8 +41,12 @@ import org.apache.mahout.clustering.kmeans.TestKmeansClustering;
 import org.apache.mahout.clustering.meanshift.MeanShiftCanopyDriver;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.MahoutTestCase;
+import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.EuclideanDistanceMeasure;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirIterable;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.VectorWritable;
 import org.junit.Before;
@@ -120,20 +122,11 @@ public final class TestClusterEvaluator extends MahoutTestCase {
       Path out = new Path(getTestTempDirPath("output"), "representativePoints-" + i);
       System.out.println("Representative Points for iteration " + i);
       Configuration conf = new Configuration();
-      FileSystem fs = FileSystem.get(conf);
-      for (FileStatus file : fs.listStatus(out)) {
-        if (!file.getPath().getName().startsWith(".")) {
-          SequenceFile.Reader reader = new SequenceFile.Reader(fs, file.getPath(), conf);
-          try {
-            Writable clusterId = new IntWritable(0);
-            VectorWritable point = new VectorWritable();
-            while (reader.next(clusterId, point)) {
-              System.out.println("\tC-" + clusterId + ": " + AbstractCluster.formatVector(point.get(), null));
-            }
-          } finally {
-            reader.close();
-          }
-        }
+      for (Pair<IntWritable,VectorWritable> record :
+           new SequenceFileDirIterable<IntWritable,VectorWritable>(
+               out, PathType.LIST, PathFilters.logsCRCFilter(), null, true, conf)) {
+        System.out.println("\tC-" + record.getFirst().get()
+                           + ": " + AbstractCluster.formatVector(record.getSecond().get(), null));
       }
     }
   }
@@ -175,7 +168,7 @@ public final class TestClusterEvaluator extends MahoutTestCase {
     printRepPoints(numIterations);
     ClusterEvaluator evaluatorMR = new ClusterEvaluator(conf, clustersIn);
     // now run again using sequential reference point calculation
-    HadoopUtil.overwriteOutput(output);
+    HadoopUtil.delete(conf, output);
     CanopyDriver.run(conf, testdata, output, measure, 3.1, 1.1, true, true);
     RepresentativePointsDriver.run(conf, clustersIn, new Path(output, "clusteredPoints"), output, measure, numIterations, true);
     printRepPoints(numIterations);
@@ -340,8 +333,12 @@ public final class TestClusterEvaluator extends MahoutTestCase {
   @Test
   public void testDirichlet() throws Exception {
     ClusteringTestUtils.writePointsToFile(sampleData, new Path(testdata, "file1"), fs, conf);
-    ModelDistribution<VectorWritable> modelDistribution = new GaussianClusterDistribution(new VectorWritable(new DenseVector(2)));
-    DirichletDriver.run(testdata, output, modelDistribution, 15, 5, 1.0, true, true, 0, true);
+    DistributionDescription description =
+        new DistributionDescription(GaussianClusterDistribution.class.getName(),
+                                    DenseVector.class.getName(),
+                                    null,
+                                    2);
+    DirichletDriver.run(testdata, output, description, 15, 5, 1.0, true, true, 0, true);
     int numIterations = 10;
     Configuration conf = new Configuration();
     Path clustersIn = new Path(output, "clusters-5");

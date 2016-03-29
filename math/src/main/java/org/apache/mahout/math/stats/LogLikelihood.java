@@ -24,6 +24,10 @@ import com.google.common.collect.Ordering;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+<<<<<<< HEAD
+=======
+import java.util.Queue;
+>>>>>>> refs/remotes/tdunning/lll
 
 /**
  * Utility methods for working with log-likelihood
@@ -126,16 +130,31 @@ public final class LogLikelihood {
    * in a than b.  Use -Double.MAX_VALUE (not Double.MIN_VALUE !) to not use a threshold.
    * @return  A list of scored items with their scores.
    */
+<<<<<<< HEAD
   public static <T> List<ScoredItem<T>> compareFrequencies(Multiset<T> a, Multiset<T> b, int maxReturn, double threshold) {
+=======
+  public static <T> List<ScoredItem<T>> compareFrequencies(Multiset<T> a,
+                                                           Multiset<T> b,
+                                                           int maxReturn,
+                                                           double threshold) {
+>>>>>>> refs/remotes/tdunning/lll
     int totalA = a.size();
     int totalB = b.size();
 
     Ordering<ScoredItem<T>> byScoreAscending = new Ordering<ScoredItem<T>>() {
+<<<<<<< HEAD
+=======
+      @Override
+>>>>>>> refs/remotes/tdunning/lll
       public int compare(ScoredItem<T> tScoredItem, ScoredItem<T> tScoredItem1) {
         return Double.compare(tScoredItem.score, tScoredItem1.score);
       }
     };
+<<<<<<< HEAD
     PriorityQueue<ScoredItem<T>> best = new PriorityQueue<ScoredItem<T>>(maxReturn + 1, byScoreAscending);
+=======
+    Queue<ScoredItem<T>> best = new PriorityQueue<ScoredItem<T>>(maxReturn + 1, byScoreAscending);
+>>>>>>> refs/remotes/tdunning/lll
 
     for (T t : a.elementSet()) {
       compareAndAdd(a, b, maxReturn, threshold, totalA, totalB, best, t);
@@ -156,7 +175,18 @@ public final class LogLikelihood {
     return r;
   }
 
+<<<<<<< HEAD
   private static <T> void compareAndAdd(Multiset<T> a, Multiset<T> b, int maxReturn, double threshold, int totalA, int totalB, PriorityQueue<ScoredItem<T>> best, T t) {
+=======
+  private static <T> void compareAndAdd(Multiset<T> a,
+                                        Multiset<T> b,
+                                        int maxReturn,
+                                        double threshold,
+                                        int totalA,
+                                        int totalB,
+                                        Queue<ScoredItem<T>> best,
+                                        T t) {
+>>>>>>> refs/remotes/tdunning/lll
     int kA = a.count(t);
     int kB = b.count(t);
     double score = rootLogLikelihoodRatio(kA, totalA - kA, kB, totalB - kB);
@@ -169,13 +199,30 @@ public final class LogLikelihood {
     }
   }
 
+<<<<<<< HEAD
   public final static class ScoredItem<T> {
     public T item;
     public double score;
+=======
+  public static final class ScoredItem<T> {
+    private final T item;
+    private final double score;
+>>>>>>> refs/remotes/tdunning/lll
 
     public ScoredItem(T item, double score) {
       this.item = item;
       this.score = score;
     }
+<<<<<<< HEAD
+=======
+
+    public double getScore() {
+      return score;
+    }
+
+    public T getItem() {
+      return item;
+    }
+>>>>>>> refs/remotes/tdunning/lll
   }
 }

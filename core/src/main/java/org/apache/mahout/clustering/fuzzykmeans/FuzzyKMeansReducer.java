@@ -36,7 +36,8 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
   private FuzzyKMeansClusterer clusterer;
 
   @Override
-  protected void reduce(Text key, Iterable<ClusterObservations> values, Context context) throws IOException, InterruptedException {
+  protected void reduce(Text key, Iterable<ClusterObservations> values, Context context)
+    throws IOException, InterruptedException {
     SoftCluster cluster = clusterMap.get(key.toString());
     for (ClusterObservations value : values) {
       if (value.getCombinerState() == 0) { // escaped from combiner
@@ -50,6 +51,7 @@ public class FuzzyKMeansReducer extends Reducer<Text, ClusterObservations, Text,
     if (converged) {
       context.getCounter("Clustering", "Converged Clusters").increment(1);
     }
+    cluster.computeParameters();
     context.write(new Text(cluster.getIdentifier()), cluster);
   }
 

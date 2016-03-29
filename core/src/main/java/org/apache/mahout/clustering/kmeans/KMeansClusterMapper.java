@@ -30,13 +30,22 @@ import org.apache.mahout.clustering.WeightedVectorWritable;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.math.VectorWritable;
 
-public class KMeansClusterMapper extends Mapper<WritableComparable<?>,VectorWritable,IntWritable,WeightedVectorWritable> {
+/**
+ * The {@link org.apache.mahout.clustering.kmeans.KMeansClusterMapper} is responsible for calculating
+ * which points belong to which clusters and outputting the information.  This is an optional step,
+ * as some applications only care about what the Centroids are.
+ *
+ * @see KMeansDriver for more information on how to invoke this process
+ */
+public class KMeansClusterMapper
+    extends Mapper<WritableComparable<?>,VectorWritable,IntWritable,WeightedVectorWritable> {
   
   private final Collection<Cluster> clusters = new ArrayList<Cluster>();
   private KMeansClusterer clusterer;
 
   @Override
-  protected void map(WritableComparable<?> key, VectorWritable point, Context context) throws IOException, InterruptedException {
+  protected void map(WritableComparable<?> key, VectorWritable point, Context context)
+    throws IOException, InterruptedException {
     clusterer.outputPointWithClusterInfo(point.get(), clusters, context);
   }
 
@@ -52,7 +61,7 @@ public class KMeansClusterMapper extends Mapper<WritableComparable<?>,VectorWrit
       
       String clusterPath = conf.get(KMeansConfigKeys.CLUSTER_PATH_KEY);
       if ((clusterPath != null) && (clusterPath.length() > 0)) {
-        KMeansUtil.configureWithClusterInfo(new Path(clusterPath), clusters);
+        KMeansUtil.configureWithClusterInfo(conf, new Path(clusterPath), clusters);
         if (clusters.isEmpty()) {
           throw new IllegalStateException("No clusters found. Check your -c path.");
         }

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class MinHashMapper extends Mapper<Text,Writable,Text,Writable> {
+public class MinHashMapper extends Mapper<Text,VectorWritable,Text,Writable> {
   
   private static final Logger log = LoggerFactory.getLogger(MinHashMapper.class);
   
@@ -72,8 +72,8 @@ public class MinHashMapper extends Mapper<Text,Writable,Text,Writable> {
    * cluster-id as 'key' and item-id as 'value'
    */
   @Override
-  public void map(Text item, Writable features, Context context) throws IOException, InterruptedException {
-    Vector featureVector = ((VectorWritable) features).get();
+  public void map(Text item, VectorWritable features, Context context) throws IOException, InterruptedException {
+    Vector featureVector = features.get();
     if (featureVector.size() < minVectorSize) {
       return;
     }
@@ -88,7 +88,7 @@ public class MinHashMapper extends Mapper<Text,Writable,Text,Writable> {
         bytesToHash[0] = (byte) (value >> 24);
         bytesToHash[1] = (byte) (value >> 16);
         bytesToHash[2] = (byte) (value >> 8);
-        bytesToHash[3] = (byte) (value);
+        bytesToHash[3] = (byte) value;
         int hashIndex = hashFunction[i].hash(bytesToHash);
         if (minHashValues[i] > hashIndex) {
           minHashValues[i] = hashIndex;

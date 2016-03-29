@@ -19,17 +19,16 @@ package org.apache.mahout.cf.taste.impl.similarity;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 
+import com.google.common.collect.AbstractIterator;
 import org.apache.mahout.cf.taste.common.Refreshable;
 import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.impl.common.FastByIDMap;
+import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.impl.recommender.TopItems;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
 import org.apache.mahout.common.RandomUtils;
-import org.apache.mahout.common.iterator.IteratorIterable;
-import org.apache.mahout.common.iterator.IteratorUtils;
 
 import com.google.common.base.Preconditions;
 
@@ -48,9 +47,12 @@ import com.google.common.base.Preconditions;
  * </p>
  */
 public final class GenericItemSimilarity implements ItemSimilarity {
+
+  private static final long[] NO_IDS = new long[0];
   
   private final FastByIDMap<FastByIDMap<Double>> similarityMaps = new FastByIDMap<FastByIDMap<Double>>();
-  
+  private final FastByIDMap<FastIDSet> similarItemIDsIndex = new FastByIDMap<FastIDSet>();
+
   /**
    * <p>
    * Creates a  from a precomputed list of {@link ItemItemSimilarity}s. Each
@@ -58,18 +60,18 @@ public final class GenericItemSimilarity implements ItemSimilarity {
    * not necessary to specify similarity between item1 and item2, and item2 and item1. Both are the same. It
    * is also not necessary to specify a similarity between any item and itself; these are assumed to be 1.0.
    * </p>
-   * 
+   *
    * <p>
    * Note that specifying a similarity between two items twice is not an error, but, the later value will win.
    * </p>
-   * 
+   *
    * @param similarities
    *          set of {@link ItemItemSimilarity}s on which to base this instance
    */
   public GenericItemSimilarity(Iterable<ItemItemSimilarity> similarities) {
-    initSimilarityMaps(similarities);
+    initSimilarityMaps(similarities.iterator());
   }
-  
+
   /**
    * <p>
    * Like {@link #GenericItemSimilarity(Iterable)}, but will only keep the specified number of similarities
@@ -87,11 +89,11 @@ public final class GenericItemSimilarity implements ItemSimilarity {
    *          maximum number of similarities to keep
    */
   public GenericItemSimilarity(Iterable<ItemItemSimilarity> similarities, int maxToKeep) {
-    Iterable<ItemItemSimilarity> keptSimilarities = TopItems.getTopItemItemSimilarities(maxToKeep,
-      similarities);
-    initSimilarityMaps(keptSimilarities);
+    Iterable<ItemItemSimilarity> keptSimilarities =
+        TopItems.getTopItemItemSimilarities(maxToKeep, similarities.iterator());
+    initSimilarityMaps(keptSimilarities.iterator());
   }
-  
+
   /**
    * <p>
    * Builds a list of item-item similarities given an {@link ItemSimilarity} implementation and a
@@ -113,11 +115,10 @@ public final class GenericItemSimilarity implements ItemSimilarity {
    *           if an error occurs while accessing the {@link DataModel} items
    */
   public GenericItemSimilarity(ItemSimilarity otherSimilarity, DataModel dataModel) throws TasteException {
-    long[] itemIDs = IteratorUtils.longIteratorToList(dataModel.getItemIDs());
-    Iterator<ItemItemSimilarity> it = new DataModelSimilaritiesIterator(otherSimilarity, itemIDs);
-    initSimilarityMaps(new IteratorIterable<ItemItemSimilarity>(it));
+    long[] itemIDs = GenericUserSimilarity.longIteratorToList(dataModel.getItemIDs());
+    initSimilarityMaps(new DataModelSimilaritiesIterator(otherSimilarity, itemIDs));
   }
-  
+
   /**
    * <p>
    * Like {@link #GenericItemSimilarity(ItemSimilarity, DataModel)} )}, but will only keep the specified
@@ -139,16 +140,17 @@ public final class GenericItemSimilarity implements ItemSimilarity {
    *           if an error occurs while accessing the {@link DataModel} items
    */
   public GenericItemSimilarity(ItemSimilarity otherSimilarity,
-                               DataModel dataModel, int maxToKeep) throws TasteException {
-    long[] itemIDs = IteratorUtils.longIteratorToList(dataModel.getItemIDs());
+                               DataModel dataModel,
+                               int maxToKeep) throws TasteException {
+    long[] itemIDs = GenericUserSimilarity.longIteratorToList(dataModel.getItemIDs());
     Iterator<ItemItemSimilarity> it = new DataModelSimilaritiesIterator(otherSimilarity, itemIDs);
-    Iterable<ItemItemSimilarity> keptSimilarities = TopItems.getTopItemItemSimilarities(maxToKeep,
-      new IteratorIterable<ItemItemSimilarity>(it));
-    initSimilarityMaps(keptSimilarities);
+    Iterable<ItemItemSimilarity> keptSimilarities = TopItems.getTopItemItemSimilarities(maxToKeep, it);
+    initSimilarityMaps(keptSimilarities.iterator());
   }
-  
-  private void initSimilarityMaps(Iterable<ItemItemSimilarity> similarities) {
-    for (ItemItemSimilarity iic : similarities) {
+
+  private void initSimilarityMaps(Iterator<ItemItemSimilarity> similarities) {
+    while (similarities.hasNext()) {
+      ItemItemSimilarity iic = similarities.next();
       long similarityItemID1 = iic.getItemID1();
       long similarityItemID2 = iic.getItemID2();
       if (similarityItemID1 != similarityItemID2) {
@@ -168,11 +170,23 @@ public final class GenericItemSimilarity implements ItemSimilarity {
           similarityMaps.put(itemID1, map);
         }
         map.put(itemID2, iic.getValue());
+
+        doIndex(itemID1, itemID2);
+        doIndex(itemID2, itemID1);
       }
       // else similarity between item and itself already assumed to be 1.0
     }
   }
-  
+
+  private void doIndex(long fromItemID, long toItemID) {
+    FastIDSet similarItemIDs = similarItemIDsIndex.get(fromItemID);
+    if (similarItemIDs == null) {
+      similarItemIDs = new FastIDSet();
+      similarItemIDsIndex.put(fromItemID, similarItemIDs);
+    }
+    similarItemIDs.add(toItemID);
+  }
+
   /**
    * <p>
    * Returns the similarity between two items. Note that similarity is assumed to be symmetric, that
@@ -217,6 +231,12 @@ public final class GenericItemSimilarity implements ItemSimilarity {
       result[i] = itemSimilarity(itemID1, itemID2s[i]);
     }
     return result;
+  }
+
+  @Override
+  public long[] allSimilarItemIDs(long itemID) {
+    FastIDSet similarItemIDs = similarItemIDsIndex.get(itemID);
+    return similarItemIDs != null ? similarItemIDs.toArray() : NO_IDS;
   }
   
   @Override
@@ -289,28 +309,27 @@ public final class GenericItemSimilarity implements ItemSimilarity {
     
   }
   
-  private static final class DataModelSimilaritiesIterator implements Iterator<ItemItemSimilarity> {
+  private static final class DataModelSimilaritiesIterator extends AbstractIterator<ItemItemSimilarity> {
     
     private final ItemSimilarity otherSimilarity;
     private final long[] itemIDs;
     private int i;
     private long itemID1;
     private int j;
-    private ItemItemSimilarity next;
-    
+
     private DataModelSimilaritiesIterator(ItemSimilarity otherSimilarity, long[] itemIDs) {
       this.otherSimilarity = otherSimilarity;
       this.itemIDs = itemIDs;
       i = 0;
       itemID1 = itemIDs[0];
       j = 1;
-      goToNext();
     }
-    
-    private void goToNext() {
-      next = null;
+
+    @Override
+    protected ItemItemSimilarity computeNext() {
       int size = itemIDs.length;
-      while ((next == null) && (i < size - 1)) {
+      ItemItemSimilarity result = null;
+      while (result == null && i < size - 1) {
         long itemID2 = itemIDs[j];
         double similarity;
         try {
@@ -320,33 +339,18 @@ public final class GenericItemSimilarity implements ItemSimilarity {
           throw new IllegalStateException(te);
         }
         if (!Double.isNaN(similarity)) {
-          next = new ItemItemSimilarity(itemID1, itemID2, similarity);
+          result = new ItemItemSimilarity(itemID1, itemID2, similarity);
         }
         if (++j == size) {
           itemID1 = itemIDs[++i];
           j = i + 1;
         }
       }
-    }
-    
-    @Override
-    public boolean hasNext() {
-      return next != null;
-    }
-    
-    @Override
-    public ItemItemSimilarity next() {
-      if (next == null) {
-        throw new NoSuchElementException();
+      if (result == null) {
+        return endOfData();
+      } else {
+        return result;
       }
-      ItemItemSimilarity result = next;
-      goToNext();
-      return result;
-    }
-    
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException();
     }
     
   }

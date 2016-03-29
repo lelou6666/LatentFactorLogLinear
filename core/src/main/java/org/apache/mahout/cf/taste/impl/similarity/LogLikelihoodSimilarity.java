@@ -24,9 +24,9 @@ import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.impl.common.RefreshHelper;
 import org.apache.mahout.cf.taste.model.DataModel;
-import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
 import org.apache.mahout.cf.taste.similarity.PreferenceInferrer;
 import org.apache.mahout.cf.taste.similarity.UserSimilarity;
+import org.apache.mahout.math.stats.LogLikelihood;
 
 /**
  * See <a href="http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.14.5962">
@@ -34,12 +34,10 @@ import org.apache.mahout.cf.taste.similarity.UserSimilarity;
  * <a href="http://tdunning.blogspot.com/2008/03/surprise-and-coincidence.html">
  * http://tdunning.blogspot.com/2008/03/surprise-and-coincidence.html</a>.
  */
-public final class LogLikelihoodSimilarity implements UserSimilarity, ItemSimilarity {
-  
-  private final DataModel dataModel;
-  
+public final class LogLikelihoodSimilarity extends AbstractItemSimilarity implements UserSimilarity {
+
   public LogLikelihoodSimilarity(DataModel dataModel) {
-    this.dataModel = dataModel;
+    super(dataModel);
   }
   
   /**
@@ -52,7 +50,8 @@ public final class LogLikelihoodSimilarity implements UserSimilarity, ItemSimila
   
   @Override
   public double userSimilarity(long userID1, long userID2) throws TasteException {
-    
+
+    DataModel dataModel = getDataModel();
     FastIDSet prefs1 = dataModel.getItemIDsFromUser(userID1);
     FastIDSet prefs2 = dataModel.getItemIDsFromUser(userID2);
     
@@ -64,15 +63,17 @@ public final class LogLikelihoodSimilarity implements UserSimilarity, ItemSimila
       return Double.NaN;
     }
     int numItems = dataModel.getNumItems();
-    double logLikelihood = twoLogLambda(intersectionSize,
-                                        prefs1Size - intersectionSize,
-                                        prefs2Size,
-                                        numItems - prefs2Size);
+    double logLikelihood =
+        LogLikelihood.logLikelihoodRatio(intersectionSize,
+                                         prefs2Size - intersectionSize,
+                                         prefs1Size - intersectionSize,
+                                         numItems - prefs1Size - prefs2Size + intersectionSize);
     return 1.0 - 1.0 / (1.0 + logLikelihood);
   }
   
   @Override
   public double itemSimilarity(long itemID1, long itemID2) throws TasteException {
+    DataModel dataModel = getDataModel();
     int preferring1 = dataModel.getNumUsersWithPreferenceFor(itemID1);
     int numUsers = dataModel.getNumUsers();    
     return doItemSimilarity(itemID1, itemID2, preferring1, numUsers);
@@ -80,6 +81,7 @@ public final class LogLikelihoodSimilarity implements UserSimilarity, ItemSimila
 
   @Override
   public double[] itemSimilarities(long itemID1, long[] itemID2s) throws TasteException {
+    DataModel dataModel = getDataModel();
     int preferring1 = dataModel.getNumUsersWithPreferenceFor(itemID1);
     int numUsers = dataModel.getNumUsers();
     int length = itemID2s.length;
@@ -91,43 +93,29 @@ public final class LogLikelihoodSimilarity implements UserSimilarity, ItemSimila
   }
 
   private double doItemSimilarity(long itemID1, long itemID2, int preferring1, int numUsers) throws TasteException {
+    DataModel dataModel = getDataModel();
     int preferring1and2 = dataModel.getNumUsersWithPreferenceFor(itemID1, itemID2);
     if (preferring1and2 == 0) {
       return Double.NaN;
     }
     int preferring2 = dataModel.getNumUsersWithPreferenceFor(itemID2);
-    double logLikelihood = twoLogLambda(preferring1and2,
-                                        preferring1 - preferring1and2,
-                                        preferring2,
-                                        numUsers - preferring2);
+    double logLikelihood =
+        LogLikelihood.logLikelihoodRatio(preferring1and2,
+                                         preferring2 - preferring1and2,
+                                         preferring1 - preferring1and2,
+                                         numUsers - preferring1 - preferring2 + preferring1and2);
     return 1.0 - 1.0 / (1.0 + logLikelihood);
   }
-  
-  static double twoLogLambda(double k1, double k2, double n1, double n2) {
-    double p = (k1 + k2) / (n1 + n2);
-    return 2.0 * (logL(k1 / n1, k1, n1)
-                  + logL(k2 / n2, k2, n2)
-                  - logL(p, k1, n1)
-                  - logL(p, k2, n2));
-  }
-  
-  private static double logL(double p, double k, double n) {
-    return k * safeLog(p) + (n - k) * safeLog(1.0 - p);
-  }
-  
-  private static double safeLog(double d) {
-    return d <= 0.0 ? 0.0 : Math.log(d);
-  }
-  
+
   @Override
   public void refresh(Collection<Refreshable> alreadyRefreshed) {
     alreadyRefreshed = RefreshHelper.buildRefreshed(alreadyRefreshed);
-    RefreshHelper.maybeRefresh(alreadyRefreshed, dataModel);
+    RefreshHelper.maybeRefresh(alreadyRefreshed, getDataModel());
   }
   
   @Override
   public String toString() {
-    return "LogLikelihoodSimilarity[dataModel:" + dataModel + ']';
+    return "LogLikelihoodSimilarity[dataModel:" + getDataModel() + ']';
   }
   
 }
