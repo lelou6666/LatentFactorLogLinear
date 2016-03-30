@@ -16,6 +16,7 @@
 package org.apache.mahout.clustering;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.mahout.classifier.AbstractVectorClassifier;
@@ -30,6 +31,7 @@ import org.apache.mahout.math.function.TimesFunction;
  * This classifier works with any of the clustering Models. It is initialized with 
  * a list of compatible Models and thereafter it can classify any new Vector into
  * one or more of the Models based upon the pdf() function which each Model supports.
+ * @deprecated in favor of ClusterClassifier
  */
 public class VectorModelClassifier extends AbstractVectorClassifier {
 
@@ -43,7 +45,7 @@ public class VectorModelClassifier extends AbstractVectorClassifier {
   public Vector classify(Vector instance) {
     Vector pdfs = new DenseVector(models.size());
     if (models.get(0) instanceof SoftCluster) {
-      List<SoftCluster> clusters = new ArrayList<SoftCluster>();
+      Collection<SoftCluster> clusters = new ArrayList<SoftCluster>();
       List<Double> distances = new ArrayList<Double>();
       for (Model<VectorWritable> model : models) {
         SoftCluster sc = (SoftCluster) model;

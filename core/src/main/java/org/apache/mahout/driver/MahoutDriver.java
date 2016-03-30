@@ -17,6 +17,7 @@
 
 package org.apache.mahout.driver;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,7 +29,6 @@ import java.util.Properties;
 import org.apache.hadoop.util.ProgramDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * General-purpose driver class for Mahout programs.  Utilizes org.apache.hadoop.util.ProgramDriver to run
@@ -91,13 +91,16 @@ public final class MahoutDriver {
   }
 
   public static void main(String[] args) throws Throwable {
-    ProgramDriver programDriver = new ProgramDriver();
-    Properties mainClasses = new Properties();
-    InputStream propsStream = Thread.currentThread()
-                                    .getContextClassLoader()
-                                    .getResourceAsStream("driver.classes.props");
 
-    mainClasses.load(propsStream);
+    ProgramDriver programDriver = new ProgramDriver();
+
+    Properties mainClasses = loadProperties("driver.classes.props");
+    if (mainClasses == null) {
+      mainClasses = loadProperties("driver.classes.default.props");
+    }
+    if (mainClasses == null) {
+      throw new IOException("Can't load any properties file?");
+    }
 
     boolean foundShortName = false;
     for (Object key :  mainClasses.keySet()) {
@@ -107,32 +110,30 @@ public final class MahoutDriver {
       }
       addClass(programDriver, keyString, mainClasses.getProperty(keyString));
     }
+
     if (args.length < 1 || args[0] == null || args[0].equals("-h") || args[0].equals("--help")) {
       programDriver.driver(args);
     }
+
     String progName = args[0];
     if (!foundShortName) {
       addClass(programDriver, progName, progName);
     }
     shift(args);
 
-    InputStream defaultsStream = Thread.currentThread()
-                                       .getContextClassLoader()
-                                       .getResourceAsStream(progName + ".props");
-
-    Properties mainProps = new Properties();
-    if (defaultsStream != null) { // can't find props file, use empty props.
-      mainProps.load(defaultsStream);
-    } else {
+    Properties mainProps = loadProperties(progName + ".props");
+    if (mainProps == null) {
       log.warn("No " + progName + ".props found on classpath, will use command-line arguments only");
+      mainProps = new Properties();
     }
+
     Map<String,String[]> argMap = new HashMap<String,String[]>();
     int i = 0;
     while (i < args.length && args[i] != null) {
       List<String> argValues = new ArrayList<String>();
       String arg = args[i];
       i++;
-      if (arg.length() > 2 && arg.charAt(1) == 'D') { // '-Dkey=value' or '-Dkey=value1,value2,etc' case
+      if (arg.startsWith("-D")) { // '-Dkey=value' or '-Dkey=value1,value2,etc' case
         String[] argSplit = arg.split("=");
         arg = argSplit[0];
         if (argSplit.length == 2) {
@@ -140,16 +141,17 @@ public final class MahoutDriver {
         }
       } else {                                      // '-key [values]' or '--key [values]' case.
         while (i < args.length && args[i] != null) {
-          if (args[i].length() > 0 && args[i].charAt(0) != '-') {
-            argValues.add(args[i]);
-            i++;
-          } else {
+          if (args[i].startsWith("-")) {
             break;
           }
+          argValues.add(args[i]);
+          i++;
         }
       }
       argMap.put(arg, argValues.toArray(new String[argValues.size()]));
     }
+
+    // Add properties from the .props file that are not overridden on the command line
     for (String key : mainProps.stringPropertyNames()) {
       String[] argNamePair = key.split("\\|");
       String shortArg = '-' + argNamePair[0].trim();
@@ -158,25 +160,52 @@ public final class MahoutDriver {
         argMap.put(longArg, new String[] {mainProps.getProperty(key)});
       }
     }
+
+    // Now add command-line args
     List<String> argsList = new ArrayList<String>();
     argsList.add(progName);
-    for (String arg : argMap.keySet()) {
+    for (Map.Entry<String,String[]> entry : argMap.entrySet()) {
+      String arg = entry.getKey();
       if (arg.startsWith("-D")) { // arg is -Dkey - if value for this !isEmpty(), then arg -> -Dkey + "=" + value
-        if (argMap.get(arg).length > 0 && !argMap.get(arg)[0].trim().isEmpty()) {
-          arg += '=' + argMap.get(arg)[0].trim();
+        String[] argValues = entry.getValue();
+        if (argValues.length > 0 && !argValues[0].trim().isEmpty()) {
+          arg += '=' + argValues[0].trim();
+        }
+        argsList.add(1, arg);
+      } else {
+        argsList.add(arg);
+        for (String argValue : Arrays.asList(argMap.get(arg))) {
+          if (argValue.length() > 0) {
+            argsList.add(argValue);
+          }
         }
       }
-      argsList.add(arg);
-      if (!arg.startsWith("-D")) {
-        argsList.addAll(Arrays.asList(argMap.get(arg)));
+    }
+
+    long start = System.currentTimeMillis();
+
+    programDriver.driver(argsList.toArray(new String[argsList.size()]));
+
+    if (log.isInfoEnabled()) {
+      log.info("Program took {} ms", System.currentTimeMillis() - start);
+    }
+  }
+
+  private static Properties loadProperties(String resource) throws IOException {
+    InputStream propsStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource);
+    if (propsStream != null) {
+      try {
+        Properties properties = new Properties();
+        properties.load(propsStream);
+        return properties;
+      } catch (IOException ioe) {
+        log.warn("Error while loading {}", resource, ioe);
+        // Continue
+      } finally {
+        propsStream.close();
       }
     }
-    long start = System.currentTimeMillis();
-    programDriver.driver(argsList.toArray(new String[argsList.size()]));
-    long finish = System.currentTimeMillis();
-    if (log.isInfoEnabled()) {
-      log.info("Program took " + (finish - start) + " ms");
-    }
+    return null;
   }
 
   private static String[] shift(String[] args) {
@@ -198,9 +227,9 @@ public final class MahoutDriver {
       Class<?> clazz = Class.forName(classString);
       driver.addClass(shortName(descString), clazz, desc(descString));
     } catch (ClassNotFoundException e) {
-      log.warn("Unable to add class: " + classString, e);
+      log.warn("Unable to add class: {}", classString, e);
     } catch (Throwable t) {
-      log.warn("Unable to add class: " + classString, t);
+      log.warn("Unable to add class: {}", classString, t);
     }
   }
 

@@ -37,7 +37,6 @@ import org.apache.mahout.classifier.ResultAnalyzer;
 import org.apache.mahout.classifier.bayes.algorithm.BayesAlgorithm;
 import org.apache.mahout.classifier.bayes.algorithm.CBayesAlgorithm;
 import org.apache.mahout.classifier.bayes.common.BayesParameters;
-import org.apache.mahout.classifier.bayes.datastore.HBaseBayesDatastore;
 import org.apache.mahout.classifier.bayes.datastore.InMemoryBayesDatastore;
 import org.apache.mahout.classifier.bayes.exceptions.InvalidDatastoreException;
 import org.apache.mahout.classifier.bayes.interfaces.Algorithm;
@@ -45,7 +44,7 @@ import org.apache.mahout.classifier.bayes.interfaces.Datastore;
 import org.apache.mahout.classifier.bayes.mapreduce.bayes.BayesClassifierDriver;
 import org.apache.mahout.classifier.bayes.model.ClassifierContext;
 import org.apache.mahout.common.CommandLineUtil;
-import org.apache.mahout.common.FileLineIterable;
+import org.apache.mahout.common.iterator.FileLineIterable;
 import org.apache.mahout.common.TimingStatistics;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.apache.mahout.common.nlp.NGrams;
@@ -72,7 +71,7 @@ public final class TestClassifier {
     
     Option pathOpt = obuilder.withLongName("model").withRequired(true).withArgument(
       abuilder.withName("model").withMinimum(1).withMaximum(1).create()).withDescription(
-      "The path on HDFS / Name of Hbase Table as defined by the -source parameter").withShortName("m")
+      "The path on HDFS as defined by the -source parameter").withShortName("m")
         .create();
     
     Option dirOpt = obuilder.withLongName("testDir").withRequired(true).withArgument(
@@ -89,7 +88,7 @@ public final class TestClassifier {
       abuilder.withName("defaultCat").withMinimum(1).withMaximum(1).create()).withDescription(
       "The default category Default Value: unknown").withShortName("default").create();
     
-    Option gramSizeOpt = obuilder.withLongName("gramSize").withRequired(true).withArgument(
+    Option gramSizeOpt = obuilder.withLongName("gramSize").withRequired(false).withArgument(
       abuilder.withName("gramSize").withMinimum(1).withMaximum(1).create()).withDescription(
       "Size of the n-gram. Default Value: 1").withShortName("ng").create();
     
@@ -100,13 +99,13 @@ public final class TestClassifier {
     Option verboseOutputOpt = obuilder.withLongName("verbose").withRequired(false).withDescription(
       "Output which values were correctly and incorrectly classified").withShortName("v").create();
     
-    Option typeOpt = obuilder.withLongName("classifierType").withRequired(true).withArgument(
+    Option typeOpt = obuilder.withLongName("classifierType").withRequired(false).withArgument(
       abuilder.withName("classifierType").withMinimum(1).withMaximum(1).create()).withDescription(
       "Type of classifier: bayes|cbayes. Default Value: bayes").withShortName("type").create();
     
-    Option dataSourceOpt = obuilder.withLongName("dataSource").withRequired(true).withArgument(
+    Option dataSourceOpt = obuilder.withLongName("dataSource").withRequired(false).withArgument(
       abuilder.withName("dataSource").withMinimum(1).withMaximum(1).create()).withDescription(
-      "Location of model: hdfs|hbase Default Value: hdfs").withShortName("source").create();
+      "Location of model: hdfs").withShortName("source").create();
     
     Option methodOpt = obuilder.withLongName("method").withRequired(false).withArgument(
       abuilder.withName("method").withMinimum(1).withMaximum(1).create()).withDescription(
@@ -130,12 +129,6 @@ public final class TestClassifier {
       BayesParameters params = new BayesParameters();
       // Setting all default values
       int gramSize = 1;
-      String classifierType = "bayes";      
-      String dataSource = "hdfs";
-      String defaultCat = "unknown";
-      String encoding = "UTF-8";
-      String alphaI = "1.0";
-      String classificationMethod = "sequential";
 
       String modelBasePath = (String) cmdLine.getValue(pathOpt);
       
@@ -143,23 +136,28 @@ public final class TestClassifier {
         gramSize = Integer.parseInt((String) cmdLine.getValue(gramSizeOpt));
         
       }
-      
-      if (cmdLine.hasOption(classifierType)) {
+
+      String classifierType = "bayes";
+      if (cmdLine.hasOption(typeOpt)) {
         classifierType = (String) cmdLine.getValue(typeOpt);
       }
-      
-      if (cmdLine.hasOption(dataSource)) {
-        dataSource = (String) cmdLine.getValue(dataSource);
+
+      String dataSource = "hdfs";
+      if (cmdLine.hasOption(dataSourceOpt)) {
+        dataSource = (String) cmdLine.getValue(dataSourceOpt);
       }
-      
+
+      String defaultCat = "unknown";
       if (cmdLine.hasOption(defaultCatOpt)) {
         defaultCat = (String) cmdLine.getValue(defaultCatOpt);
       }
-      
+
+      String encoding = "UTF-8";
       if (cmdLine.hasOption(encodingOpt)) {
         encoding = (String) cmdLine.getValue(encodingOpt);
       }
-      
+
+      String alphaI = "1.0";
       if (cmdLine.hasOption(alphaOpt)) {
         alphaI = (String) cmdLine.getValue(alphaOpt);
       }
@@ -167,14 +165,15 @@ public final class TestClassifier {
       boolean verbose = cmdLine.hasOption(verboseOutputOpt);
       
       String testDirPath = (String) cmdLine.getValue(dirOpt);
-      
+
+      String classificationMethod = "sequential";
       if (cmdLine.hasOption(methodOpt)) {
         classificationMethod = (String) cmdLine.getValue(methodOpt);
       }
       
       params.setGramSize(gramSize);
       params.set("verbose", Boolean.toString(verbose));
-      params.set("basePath", modelBasePath);
+      params.setBasePath(modelBasePath);
       params.set("classifierType", classifierType);
       params.set("dataSource", dataSource);
       params.set("defaultCat", defaultCat);
@@ -215,19 +214,6 @@ public final class TestClassifier {
         log.info("Testing Complementary Bayes Classifier");
         algorithm = new CBayesAlgorithm();
         datastore = new InMemoryBayesDatastore(params);
-      } else {
-        throw new IllegalArgumentException("Unrecognized classifier type: " + params.get("classifierType"));
-      }
-      
-    } else if (params.get("dataSource").equals("hbase")) {
-      if (params.get("classifierType").equalsIgnoreCase("bayes")) {
-        log.info("Testing Bayes Classifier");
-        algorithm = new BayesAlgorithm();
-        datastore = new HBaseBayesDatastore(params.get("basePath"), params);
-      } else if (params.get("classifierType").equalsIgnoreCase("cbayes")) {
-        log.info("Testing Complementary Bayes Classifier");
-        algorithm = new CBayesAlgorithm();
-        datastore = new HBaseBayesDatastore(params.get("basePath"), params);
       } else {
         throw new IllegalArgumentException("Unrecognized classifier type: " + params.get("classifierType"));
       }
@@ -289,9 +275,9 @@ public final class TestClassifier {
       
     }
     if (verbose) {
-      log.info("{}", totalStatistics.toString());
+      log.info("{}", totalStatistics);
     }
-    log.info(resultAnalyzer.summarize());
+    log.info("{}", resultAnalyzer);
   }
   
   public static void classifyParallel(BayesParameters params) throws IOException {

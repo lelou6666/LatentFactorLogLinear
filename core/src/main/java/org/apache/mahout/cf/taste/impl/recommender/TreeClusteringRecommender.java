@@ -169,7 +169,7 @@ public final class TreeClusteringRecommender extends AbstractRecommender impleme
                                    double clusteringThreshold,
                                    double samplingRate) throws TasteException {
     super(dataModel);
-    Preconditions.checkArgument( clusterSimilarity != null, "clusterSimilarity is null" );
+    Preconditions.checkArgument(clusterSimilarity != null, "clusterSimilarity is null");
     Preconditions.checkArgument(!Double.isNaN(clusteringThreshold), "clusteringThreshold must not be NaN");
     Preconditions.checkArgument(samplingRate > 0.0 && samplingRate <= 1.0, "samplingRate is invalid: %f", samplingRate);
     this.clusterSimilarity = clusterSimilarity;
@@ -344,7 +344,7 @@ public final class TreeClusteringRecommender extends AbstractRecommender impleme
       List<RecommendedItem> recs = computeTopRecsForCluster(cluster);
       LongPrimitiveIterator it = cluster.iterator();
       while (it.hasNext()) {
-        recsPerUser.put(it.next(), recs);
+        recsPerUser.put(it.nextLong(), recs);
       }
     }
     return recsPerUser;
@@ -355,7 +355,7 @@ public final class TreeClusteringRecommender extends AbstractRecommender impleme
     FastIDSet possibleItemIDs = new FastIDSet();
     LongPrimitiveIterator it = cluster.iterator();
     while (it.hasNext()) {
-      possibleItemIDs.addAll(dataModel.getItemIDsFromUser(it.next()));
+      possibleItemIDs.addAll(dataModel.getItemIDsFromUser(it.nextLong()));
     }
     
     TopItems.Estimator<Long> estimator = new Estimator(cluster);
@@ -372,7 +372,7 @@ public final class TreeClusteringRecommender extends AbstractRecommender impleme
     for (FastIDSet cluster : clusters) {
       LongPrimitiveIterator it = cluster.iterator();
       while (it.hasNext()) {
-        clustersPerUser.put(it.next(), cluster);
+        clustersPerUser.put(it.nextLong(), cluster);
       }
     }
     return clustersPerUser;
@@ -402,7 +402,7 @@ public final class TreeClusteringRecommender extends AbstractRecommender impleme
       RunningAverage average = new FullRunningAverage();
       LongPrimitiveIterator it = cluster.iterator();
       while (it.hasNext()) {
-        Float pref = dataModel.getPreferenceValue(it.next(), itemID);
+        Float pref = dataModel.getPreferenceValue(it.nextLong(), itemID);
         if (pref != null) {
           average.addDatum(pref);
         }

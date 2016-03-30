@@ -16,7 +16,7 @@
  */
 package org.apache.mahout.math.function;
 
-public class TimesFunction implements BinaryFunction {
+public final class TimesFunction implements DoubleDoubleFunction {
 
   /**
    * Computes the product of two numbers.
@@ -25,6 +25,7 @@ public class TimesFunction implements BinaryFunction {
    * @param y second argument
    * @return the product
    */
+  @Override
   public double apply(double x, double y) {
     return x * y;
   }

@@ -17,8 +17,6 @@
 
 package org.apache.mahout.math.jet.random;
 
-import org.apache.commons.math.ConvergenceException;
-import org.apache.commons.math.FunctionEvaluationException;
 import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.math.MahoutTestCase;
 import org.junit.Test;
@@ -45,7 +43,7 @@ public final class NormalTest extends MahoutTestCase {
   }
 
   @Test
-  public void consistency() throws ConvergenceException, FunctionEvaluationException {
+  public void consistency() throws Exception {
     Random gen = RandomUtils.getRandom();
     double offset = 0;
     double scale = 1;

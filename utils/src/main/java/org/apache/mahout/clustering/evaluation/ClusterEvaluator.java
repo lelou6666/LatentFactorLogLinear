@@ -17,20 +17,18 @@
 
 package org.apache.mahout.clustering.evaluation;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.SequenceFile;
-import org.apache.hadoop.io.Writable;
 import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.common.distance.DistanceMeasure;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirValueIterable;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 import org.slf4j.Logger;
@@ -46,7 +44,7 @@ public class ClusterEvaluator {
 
   private final DistanceMeasure measure;
 
-  private boolean pruned = false;
+  private boolean pruned;
 
   /**
    * For testing only
@@ -58,7 +56,8 @@ public class ClusterEvaluator {
    * @param measure
    *            an appropriate DistanceMeasure
    */
-  public ClusterEvaluator(Map<Integer, List<VectorWritable>> representativePoints, List<Cluster> clusters, DistanceMeasure measure) {
+  public ClusterEvaluator(Map<Integer, List<VectorWritable>> representativePoints,
+                          List<Cluster> clusters, DistanceMeasure measure) {
     this.representativePoints = representativePoints;
     this.clusters = clusters;
     this.measure = measure;
@@ -68,12 +67,12 @@ public class ClusterEvaluator {
    * Initialize a new instance from job information
    * 
    * @param conf
-   *            a JobConf with appropriate parameters
+   *            a Configuration with appropriate parameters
    * @param clustersIn
    *            a String path to the input clusters directory
    */
-  public ClusterEvaluator(Configuration conf, Path clustersIn) throws ClassNotFoundException, InstantiationException,
-      IllegalAccessException, IOException {
+  public ClusterEvaluator(Configuration conf, Path clustersIn)
+    throws ClassNotFoundException, InstantiationException, IllegalAccessException {
     ClassLoader ccl = Thread.currentThread().getContextClassLoader();
     measure = ccl.loadClass(conf.get(RepresentativePointsDriver.DISTANCE_MEASURE_KEY)).asSubclass(DistanceMeasure.class)
         .newInstance();
@@ -88,23 +87,11 @@ public class ClusterEvaluator {
    *            a String pathname to the directory containing input cluster files
    * @return a List<Cluster> of the clusters
    */
-  private static List<Cluster> loadClusters(Configuration conf, Path clustersIn) throws InstantiationException,
-      IllegalAccessException, IOException {
+  private static List<Cluster> loadClusters(Configuration conf, Path clustersIn) {
     List<Cluster> clusters = new ArrayList<Cluster>();
-    FileSystem fs = clustersIn.getFileSystem(conf);
-    for (FileStatus part : fs.listStatus(clustersIn)) {
-      if (!part.getPath().getName().startsWith(".")) {
-        Path inPart = part.getPath();
-        SequenceFile.Reader reader = new SequenceFile.Reader(fs, inPart, conf);
-        Writable key = reader.getKeyClass().asSubclass(Writable.class).newInstance();
-        Writable value = reader.getValueClass().asSubclass(Writable.class).newInstance();
-        while (reader.next(key, value)) {
-          Cluster cluster = (Cluster) value;
-          clusters.add(cluster);
-          value = reader.getValueClass().asSubclass(Writable.class).newInstance();
-        }
-        reader.close();
-      }
+    for (Cluster value :
+         new SequenceFileDirValueIterable<Cluster>(clustersIn, PathType.LIST, PathFilters.logsCRCFilter(), conf)) {
+      clusters.add(value);
     }
     return clusters;
   }

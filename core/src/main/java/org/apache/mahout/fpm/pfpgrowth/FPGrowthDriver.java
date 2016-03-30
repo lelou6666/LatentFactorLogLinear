@@ -20,9 +20,9 @@ package org.apache.mahout.fpm.pfpgrowth;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.commons.cli2.CommandLine;
 import org.apache.commons.cli2.Group;
@@ -38,11 +38,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.mahout.common.CommandLineUtil;
-import org.apache.mahout.common.FileLineIterable;
+import org.apache.mahout.common.iterator.FileLineIterable;
 import org.apache.mahout.common.HadoopUtil;
 import org.apache.mahout.common.Pair;
 import org.apache.mahout.common.Parameters;
-import org.apache.mahout.common.StringRecordIterator;
+import org.apache.mahout.common.iterator.StringRecordIterator;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
 import org.apache.mahout.fpm.pfpgrowth.convertors.ContextStatusUpdater;
 import org.apache.mahout.fpm.pfpgrowth.convertors.SequenceFileOutputCollector;
@@ -162,7 +162,8 @@ public final class FPGrowthDriver {
       if (classificationMethod.equalsIgnoreCase("sequential")) {
         runFPGrowth(params);
       } else if (classificationMethod.equalsIgnoreCase("mapreduce")) {
-        HadoopUtil.overwriteOutput(outputDir);
+        Configuration conf = new Configuration();
+        HadoopUtil.delete(conf, outputDir);
         PFPGrowth.runPFPGrowth(params);
       }
     } catch (OptionException e) {
@@ -189,7 +190,7 @@ public final class FPGrowthDriver {
     SequenceFile.Writer writer = new SequenceFile.Writer(fs, conf, path, Text.class, TopKStringPatterns.class);
     
     FPGrowth<String> fp = new FPGrowth<String>();
-    Set<String> features = new HashSet<String>();
+    Collection<String> features = new HashSet<String>();
     
     fp.generateTopKFrequentPatterns(
         new StringRecordIterator(new FileLineIterable(new File(input), encoding, false), pattern),
@@ -203,10 +204,9 @@ public final class FPGrowthDriver {
         new ContextStatusUpdater(null));
     writer.close();
     
-    List<Pair<String,TopKStringPatterns>> frequentPatterns = FPGrowth.readFrequentPattern(fs, conf, path);
+    List<Pair<String,TopKStringPatterns>> frequentPatterns = FPGrowth.readFrequentPattern(conf, path);
     for (Pair<String,TopKStringPatterns> entry : frequentPatterns) {
-      log.info("Dumping Patterns for Feature: {} \n{}", entry.getFirst(), entry.getSecond()
-          .toString());
+      log.info("Dumping Patterns for Feature: {} \n{}", entry.getFirst(), entry.getSecond());
     }
   }
 }

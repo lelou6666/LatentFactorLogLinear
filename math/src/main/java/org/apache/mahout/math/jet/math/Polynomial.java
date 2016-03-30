@@ -28,11 +28,9 @@ package org.apache.mahout.math.jet.math;
 /**
  * Polynomial functions.
  */
+public final class Polynomial {
 
-public class Polynomial extends Constants {
-
-  /** Makes this class non instantiable, but still let's others inherit from it. */
-  protected Polynomial() {
+  private Polynomial() {
   }
 
   /**
@@ -59,7 +57,7 @@ public class Polynomial extends Constants {
    * @param coef the coefficients of the polynomial.
    * @param N    the degree of the polynomial.
    */
-  public static double p1evl(double x, double[] coef, int N) throws ArithmeticException {
+  public static double p1evl(double x, double[] coef, int N) {
 
     double ans = x + coef[0];
 
@@ -88,7 +86,7 @@ public class Polynomial extends Constants {
    * @param coef the coefficients of the polynomial.
    * @param N    the degree of the polynomial.
    */
-  public static double polevl(double x, double[] coef, int N) throws ArithmeticException {
+  public static double polevl(double x, double[] coef, int N) {
     double ans = coef[0];
 
     for (int i = 1; i <= N; i++) {

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Iterators;
 import org.apache.commons.lang.mutable.MutableDouble;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
@@ -32,9 +33,8 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.shingle.ShingleFilter;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
-import org.apache.mahout.common.Parameters;
+import org.apache.mahout.classifier.bayes.common.BayesParameters;
 import org.apache.mahout.common.StringTuple;
-import org.apache.mahout.common.iterator.ArrayIterator;
 import org.apache.mahout.math.function.ObjectIntProcedure;
 import org.apache.mahout.math.map.OpenObjectIntHashMap;
 import org.slf4j.Logger;
@@ -73,13 +73,12 @@ public class BayesFeatureMapper extends MapReduceBase implements Mapper<Text,Tex
                   Text value,
                   final OutputCollector<StringTuple,DoubleWritable> output,
                   Reporter reporter) throws IOException {
-    // String line = value.toString();
     final String label = key.toString();
     String[] tokens = SPACE_PATTERN.split(value.toString());
     OpenObjectIntHashMap<String> wordList = new OpenObjectIntHashMap<String>(tokens.length * gramSize);
     
     if (gramSize > 1) {
-      ShingleFilter sf = new ShingleFilter(new IteratorTokenStream(new ArrayIterator<String>(tokens)), gramSize);
+      ShingleFilter sf = new ShingleFilter(new IteratorTokenStream(Iterators.forArray(tokens)), gramSize);
       do {
         String term = (sf.getAttribute(TermAttribute.class)).term();
         if (term.length() > 0) {
@@ -170,9 +169,9 @@ public class BayesFeatureMapper extends MapReduceBase implements Mapper<Text,Tex
   @Override
   public void configure(JobConf job) {
     try {
-      Parameters params = Parameters.fromString(job.get("bayes.parameters", ""));
+      BayesParameters params = new BayesParameters(job.get("bayes.parameters", ""));
       log.info("Bayes Parameter {}", params.print());
-      gramSize = Integer.valueOf(params.get("gramSize"));
+      gramSize = params.getGramSize();
       
     } catch (IOException ex) {
       log.warn(ex.toString(), ex);

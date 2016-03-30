@@ -21,13 +21,14 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 
 public class DistanceMeasureCluster extends AbstractCluster {
 
-  protected DistanceMeasure measure;
+  private DistanceMeasure measure;
 
   public DistanceMeasureCluster(Vector point, int id, DistanceMeasure measure) {
     super(point, id);
@@ -35,6 +36,13 @@ public class DistanceMeasureCluster extends AbstractCluster {
   }
 
   public DistanceMeasureCluster() {
+  }
+  
+  @Override
+  public void configure(Configuration job) {
+    if (getMeasure() != null) {
+      getMeasure().configure(job);
+    }
   }
 
   @Override

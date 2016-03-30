@@ -41,7 +41,7 @@ public interface Algorithm {
    * @param document
    *          The document to classify
    * @param datastore
-   *          The data store(InMemory, HBase)
+   *          The data store(InMemory)
    * @param defaultCategory
    *          The default category to assign Ties are broken by comparing the category
    * @return A Collection of {@link org.apache.mahout.classifier.ClassifierResult}s.
@@ -57,7 +57,7 @@ public interface Algorithm {
    * @param document
    *          The document to classify
    * @param datastore
-   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory, HBase)
+   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory)
    * @param defaultCategory
    *          The default category to assign
    * @param numResults
@@ -75,7 +75,7 @@ public interface Algorithm {
    * Get the weighted probability of the feature.
    * 
    * @param datastore
-   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory, HBase)
+   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory)
    * @param label
    *          The label of the feature
    * @param feature
@@ -90,22 +90,21 @@ public interface Algorithm {
    * of a particular class
    * 
    * @param datastore
-   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory, HBase)
+   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory)
    * @param label
    *          The label to calculate the probability of
    * @param document
    *          The document
    * @return The probability
-   * @throws InvalidDatastoreException
    * @see Algorithm#featureWeight(Datastore, String, String)
    */
-  double documentWeight(Datastore datastore, String label, String[] document) throws InvalidDatastoreException;
+  double documentWeight(Datastore datastore, String label, String[] document);
   
   /**
    * Returns the labels in the given Model
    * 
    * @param datastore
-   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory, HBase)
+   *          The {@link org.apache.mahout.classifier.bayes.interfaces.Datastore} (InMemory)
    * @throws InvalidDatastoreException
    * @return {@link Collection} of labels
    */

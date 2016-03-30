@@ -21,9 +21,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import org.apache.mahout.classifier.AbstractVectorClassifier;
+import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.function.BinaryFunction;
-import org.apache.mahout.math.function.Functions;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -67,7 +66,12 @@ public class ModelDissector {
    * 1 and then look at the resulting score.  This tells us the weight the model places
    * on that variable.
    * @param features               A feature vector to use (destructively)
+<<<<<<< HEAD
    * @param traceDictionary        A trace dictionary containing variables and what locations in the feature vector are affected by them
+=======
+   * @param traceDictionary        A trace dictionary containing variables and what locations
+   *                               in the feature vector are affected by them
+>>>>>>> refs/remotes/tdunning/lll
    * @param learner                The model that we are probing to find weights on features
    */
 
@@ -118,11 +122,19 @@ public class ModelDissector {
     return r;
   }
 
+<<<<<<< HEAD
   private static class Category implements Comparable<Category> {
     int index;
     double weight;
 
     public Category(int index, double weight) {
+=======
+  private static final class Category implements Comparable<Category> {
+    private final int index;
+    private final double weight;
+
+    private Category(int index, double weight) {
+>>>>>>> refs/remotes/tdunning/lll
       this.index = index;
       this.weight = weight;
     }
@@ -130,19 +142,51 @@ public class ModelDissector {
     @Override
     public int compareTo(Category o) {
       int r = Double.compare(Math.abs(weight), Math.abs(o.weight));
+<<<<<<< HEAD
       if (r != 0) {
         return r;
       } else {
         return index - o.index;
       }
     }
+=======
+      if (r == 0) {
+        if (o.index < index) {
+          return -1;
+        } else if (o.index > index) {
+          return 1;
+        }
+        return 0;
+      }
+      return r;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Category)) {
+        return false;
+      }
+      Category other = (Category) o;
+      return index == other.index && weight == other.weight;
+    }
+
+    @Override
+    public int hashCode() {
+      return RandomUtils.hashDouble(weight) ^ index;
+    }
+
+>>>>>>> refs/remotes/tdunning/lll
   }
 
   public static class Weight implements Comparable<Weight> {
     private final String feature;
     private final double value;
     private final int maxIndex;
+<<<<<<< HEAD
     private List<Category> categories;
+=======
+    private final List<Category> categories;
+>>>>>>> refs/remotes/tdunning/lll
 
     public Weight(String feature, Vector weights) {
       this(feature, weights, 3);
@@ -151,7 +195,11 @@ public class ModelDissector {
     public Weight(String feature, Vector weights, int n) {
       this.feature = feature;
       // pick out the weight with the largest abs value, but don't forget the sign
+<<<<<<< HEAD
       PriorityQueue<Category> biggest = new PriorityQueue<Category>(n + 1, Ordering.natural().reverse());
+=======
+      Queue<Category> biggest = new PriorityQueue<Category>(n + 1, Ordering.natural());
+>>>>>>> refs/remotes/tdunning/lll
       for (Vector.Element element : weights) {
         biggest.add(new Category(element.index(), element.get()));
         while (biggest.size() > n) {
@@ -169,9 +217,25 @@ public class ModelDissector {
       int r = Double.compare(Math.abs(this.value), Math.abs(other.value));
       if (r == 0) {
         return feature.compareTo(other.feature);
-      } else {
-        return r;
       }
+      return r;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof Weight)) {
+        return false;
+      }
+      Weight other = (Weight) o;
+      return feature.equals(other.feature)
+          && value == other.value
+          && maxIndex == other.maxIndex
+          && categories.equals(other.categories);
+    }
+
+    @Override
+    public int hashCode() {
+      return feature.hashCode() ^ RandomUtils.hashDouble(value) ^ maxIndex ^ categories.hashCode();
     }
 
     public String getFeature() {
@@ -186,7 +250,11 @@ public class ModelDissector {
       return categories.get(n).weight;
     }
 
+<<<<<<< HEAD
     public double getCategory(int n) {
+=======
+    public int getCategory(int n) {
+>>>>>>> refs/remotes/tdunning/lll
       return categories.get(n).index;
     }
 

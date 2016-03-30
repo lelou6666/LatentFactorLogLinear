@@ -17,15 +17,16 @@
 
 package org.apache.mahout.fpm.pfpgrowth;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.mahout.common.MahoutTestCase;
 import org.apache.mahout.common.Pair;
@@ -40,10 +41,7 @@ public final class PFPGrowthTest extends MahoutTestCase {
   private static final Logger log = LoggerFactory.getLogger(PFPGrowthTest.class);
   
   private final Parameters params = new Parameters();
-  private File input;
-  private File inputDir;
-  private File outputDir;
-  
+
   @Override
   public void setUp() throws Exception {
     super.setUp();
@@ -51,13 +49,12 @@ public final class PFPGrowthTest extends MahoutTestCase {
     params.set(PFPGrowth.MAX_HEAPSIZE, "4");
     params.set(PFPGrowth.NUM_GROUPS, "2");
     params.set(PFPGrowth.ENCODING, "UTF-8");
-    params.set(PFPGrowth.TREE_CACHE_SIZE, "5");
-    inputDir = getTestTempDir("transactions");
-    outputDir = getTestTempDir("frequentpatterns");
-    input = new File(inputDir, "test.txt");
+    File inputDir = getTestTempDir("transactions");
+    File outputDir = getTestTempDir("frequentpatterns");
+    File input = new File(inputDir, "test.txt");
     params.set(PFPGrowth.INPUT, input.getAbsolutePath());
     params.set(PFPGrowth.OUTPUT, outputDir.getAbsolutePath());
-    BufferedWriter writer = new BufferedWriter(new FileWriter(input));
+    Writer writer = Files.newWriter(input, Charsets.UTF_8);
     try {
       Collection<List<String>> transactions = new ArrayList<List<String>>();
       transactions.add(Arrays.asList("E", "A", "D", "B"));

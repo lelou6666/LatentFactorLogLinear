@@ -36,7 +36,9 @@ import com.google.common.base.Preconditions;
 public abstract class AbstractBooleanPrefJDBCDataModel extends AbstractJDBCDataModel {
   
   private static final Logger log = LoggerFactory.getLogger(AbstractBooleanPrefJDBCDataModel.class);
-  
+
+  static final String NO_SUCH_COLUMN = "NO_SUCH_COLUMN";
+
   private final String setPreferenceSQL;
   
   protected AbstractBooleanPrefJDBCDataModel(DataSource dataSource,
@@ -86,10 +88,15 @@ public abstract class AbstractBooleanPrefJDBCDataModel extends AbstractJDBCDataM
   protected Preference buildPreference(ResultSet rs) throws SQLException {
     return new BooleanPreference(getLongColumn(rs, 1), getLongColumn(rs, 2));
   }
+
+  @Override
+  String getSetPreferenceSQL() {
+    return setPreferenceSQL;
+  }
   
   @Override
   public void setPreference(long userID, long itemID, float value) throws TasteException {
-    Preconditions.checkArgument(!Float.isNaN(value), "Invalid value: " + value );
+    Preconditions.checkArgument(!Float.isNaN(value), "NaN value");
     log.debug("Setting preference for user {}, item {}", userID, itemID);
     
     Connection conn = null;

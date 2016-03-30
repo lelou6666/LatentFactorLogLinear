@@ -19,6 +19,7 @@ package org.apache.mahout.clustering.fuzzykmeans;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
@@ -29,21 +30,23 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.mahout.clustering.WeightedVectorWritable;
 import org.apache.mahout.math.VectorWritable;
 
-public class FuzzyKMeansClusterMapper extends Mapper<WritableComparable<?>, VectorWritable, IntWritable, WeightedVectorWritable> {
+public class FuzzyKMeansClusterMapper
+    extends Mapper<WritableComparable<?>, VectorWritable, IntWritable, WeightedVectorWritable> {
 
   private final List<SoftCluster> clusters = new ArrayList<SoftCluster>();
 
   private FuzzyKMeansClusterer clusterer;
 
   @Override
-  protected void map(WritableComparable<?> key, VectorWritable point, Context context) throws IOException, InterruptedException {
+  protected void map(WritableComparable<?> key, VectorWritable point, Context context)
+    throws IOException, InterruptedException {
     clusterer.emitPointToClusters(point, clusters, context);
   }
 
   @Override
   protected void setup(Context context) throws IOException, InterruptedException {
-     super.setup(context);
-     Configuration conf = context.getConfiguration();
+    super.setup(context);
+    Configuration conf = context.getConfiguration();
     clusterer = new FuzzyKMeansClusterer(conf);
 
     String clusterPath = conf.get(FuzzyKMeansConfigKeys.CLUSTER_PATH_KEY);
@@ -62,7 +65,7 @@ public class FuzzyKMeansClusterMapper extends Mapper<WritableComparable<?>, Vect
    * @param clusters
    *          a List<Cluster>
    */
-  void setup(List<SoftCluster> clusters, Configuration conf) {
+  void setup(Collection<SoftCluster> clusters, Configuration conf) {
     this.clusters.clear();
     this.clusters.addAll(clusters);
     this.clusterer = new FuzzyKMeansClusterer(conf);

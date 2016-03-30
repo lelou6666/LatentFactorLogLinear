@@ -17,41 +17,25 @@
 
 package org.apache.mahout.classifier.naivebayes;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.mahout.classifier.naivebayes.trainer.NaiveBayesTrainer;
-import org.apache.mahout.math.JsonMatrixAdapter;
-import org.apache.mahout.math.JsonVectorAdapter;
+import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.SparseMatrix;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.VectorWritable;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-
 /**
- * 
  * NaiveBayesModel holds the weight Matrix, the feature and label sums and the weight normalizer vectors.
- *
  */
-public class NaiveBayesModel implements JsonDeserializer<NaiveBayesModel>, JsonSerializer<NaiveBayesModel>, Cloneable {
- 
+public class NaiveBayesModel {
+
+  private static final String MODEL = "NaiveBayesModel";
+
   private Vector labelSum;
   private Vector perlabelThetaNormalizer;
   private Vector featureSum;
@@ -145,23 +129,21 @@ public class NaiveBayesModel implements JsonDeserializer<NaiveBayesModel>, JsonS
   }
   
   // CODE USED FOR SERIALIZATION
-  public static NaiveBayesModel fromMRTrainerOutput(Path output, Configuration conf) throws IOException {
+  public static NaiveBayesModel fromMRTrainerOutput(Path output, Configuration conf) {
     Path classVectorPath = new Path(output, NaiveBayesTrainer.CLASS_VECTORS);
     Path sumVectorPath = new Path(output, NaiveBayesTrainer.SUM_VECTORS);
     Path thetaSumPath = new Path(output, NaiveBayesTrainer.THETA_SUM);
 
     NaiveBayesModel model = new NaiveBayesModel();
     model.setAlphaI(conf.getFloat(NaiveBayesTrainer.ALPHA_I, 1.0f));
-    
-    FileSystem fs = sumVectorPath.getFileSystem(conf);
-    SequenceFile.Reader reader = new SequenceFile.Reader(fs, sumVectorPath, conf);
-    Text key = new Text();
-    VectorWritable value = new VectorWritable();
 
     int featureCount = 0;
     int labelCount = 0;
     // read feature sums and label sums
-    while (reader.next(key, value)) {
+    for (Pair<Text,VectorWritable> record
+         : new SequenceFileIterable<Text, VectorWritable>(sumVectorPath, true, conf)) {
+      Text key = record.getFirst();
+      VectorWritable value = record.getSecond();
       if (key.toString().equals(BayesConstants.FEATURE_SUM)) {
         model.setFeatureSum(value.get());
         featureCount = value.get().getNumNondefaultElements();
@@ -172,91 +154,28 @@ public class NaiveBayesModel implements JsonDeserializer<NaiveBayesModel>, JsonS
         labelCount = value.get().size();
       }
     }
-    reader.close();
-    
+
     // read the class matrix
-    reader = new SequenceFile.Reader(fs, classVectorPath, conf);
-    IntWritable label = new IntWritable();
     Matrix matrix = new SparseMatrix(new int[] {labelCount, featureCount});
-    while (reader.next(label, value)) {
+    for (Pair<IntWritable,VectorWritable> record
+         : new SequenceFileIterable<IntWritable,VectorWritable>(classVectorPath, true, conf)) {
+      IntWritable label = record.getFirst();
+      VectorWritable value = record.getSecond();
       matrix.assignRow(label.get(), value.get());
     }
-    reader.close();
     
     model.setWeightMatrix(matrix);
-   
-    
-    
-    reader = new SequenceFile.Reader(fs, thetaSumPath, conf);
+
     // read theta normalizer
-    while (reader.next(key, value)) {
+    for (Pair<Text,VectorWritable> record
+         : new SequenceFileIterable<Text,VectorWritable>(thetaSumPath, true, conf)) {
+      Text key = record.getFirst();
+      VectorWritable value = record.getSecond();
       if (key.toString().equals(BayesConstants.LABEL_THETA_NORMALIZER)) {
         model.setPerlabelThetaNormalizer(value.get());
       }
     }
-    reader.close();
-    
-    return model;
-  }
-  
-  /**
-   * Encode this NaiveBayesModel as a JSON string
-   *
-   * @return String containing the JSON of this model
-   */
-  public String toJson() {
-    GsonBuilder builder = new GsonBuilder();
-    builder.registerTypeAdapter(NaiveBayesModel.class, this);
-    Gson gson = builder.create();
-    return gson.toJson(this);
-  }
 
-  /**
-   * Decode this NaiveBayesModel from a JSON string
-   *
-   * @param json String containing JSON representation of this model
-   * @return Initialized model
-   */
-  public static NaiveBayesModel fromJson(String json) {
-    GsonBuilder builder = new GsonBuilder();
-    builder.registerTypeAdapter(NaiveBayesModel.class, new NaiveBayesModel());
-    Gson gson = builder.create();
-    return gson.fromJson(json, NaiveBayesModel.class);
-  }
-   
-  private static final String MODEL = "NaiveBayesModel";
-
-  @Override
-  public JsonElement serialize(NaiveBayesModel model,
-                               Type type,
-                               JsonSerializationContext context) {
-    // now register the builders for matrix / vector
-    GsonBuilder builder = new GsonBuilder();
-    builder.registerTypeAdapter(Matrix.class, new JsonMatrixAdapter());
-    builder.registerTypeAdapter(Vector.class, new JsonVectorAdapter());
-    Gson gson = builder.create();
-    // create a model
-    JsonObject json = new JsonObject();
-    // first, we add the model
-    json.add(MODEL, new JsonPrimitive(gson.toJson(model)));
-    return json;
-  }
-
-  @Override
-  public NaiveBayesModel deserialize(JsonElement json,
-                                     Type type,
-                                     JsonDeserializationContext context) throws JsonParseException {
-    // register the builders for matrix / vector
-    GsonBuilder builder = new GsonBuilder();
-    builder.registerTypeAdapter(Matrix.class, new JsonMatrixAdapter());
-    builder.registerTypeAdapter(Vector.class, new JsonVectorAdapter());
-    Gson gson = builder.create();
-    // now decode the original model
-    JsonObject obj = json.getAsJsonObject();
-    String modelString = obj.get(MODEL).getAsString();
-    NaiveBayesModel model = gson.fromJson(modelString, NaiveBayesModel.class);
-   
-    // return the model
     return model;
   }
   
@@ -290,13 +209,13 @@ public class NaiveBayesModel implements JsonDeserializer<NaiveBayesModel>, JsonS
           "Error: The number of labels has to be greater than 0 or defined!");
     }  
     
-    if (model.getPerlabelThetaNormalizer() == null ||
-        model.getPerlabelThetaNormalizer().getNumNondefaultElements() <= 0) {
+    if (model.getPerlabelThetaNormalizer() == null
+        || model.getPerlabelThetaNormalizer().getNumNondefaultElements() <= 0) {
       throw new IllegalArgumentException(
           "Error: The number of theta normalizers has to be greater than 0 or defined!");
     }
     
-    if (model.getFeatureSum() == null ||model.getFeatureSum().getNumNondefaultElements() <= 0) {
+    if (model.getFeatureSum() == null || model.getFeatureSum().getNumNondefaultElements() <= 0) {
       throw new IllegalArgumentException(
           "Error: The number of features has to be greater than 0 or defined!");
     }

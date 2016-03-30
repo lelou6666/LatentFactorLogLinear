@@ -17,6 +17,7 @@
 
 package org.apache.mahout.classifier.sgd;
 
+<<<<<<< HEAD
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.InstanceCreator;
@@ -39,58 +40,43 @@ import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.stats.OnlineAuc;
+=======
+import org.apache.hadoop.io.Writable;
+>>>>>>> refs/remotes/tdunning/lll
 
-import java.io.FileWriter;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.lang.reflect.Type;
-import java.util.List;
+import java.io.InputStream;
 
 /**
- * Provides the ability to store SGD model-related objects as JSON.
+ * Provides the ability to store SGD model-related objects as binary files.
  */
 public final class ModelSerializer {
-
-  // thread-local singleton json (de)serializer
-  private static final ThreadLocal<Gson> GSON;
-  static {
-    final GsonBuilder gb = new GsonBuilder();
-    gb.registerTypeAdapter(AdaptiveLogisticRegression.class, new AdaptiveLogisticRegressionTypeAdapter());
-    gb.registerTypeAdapter(Mapping.class, new PolymorphicTypeAdapter<Mapping>());
-    gb.registerTypeAdapter(PriorFunction.class, new PolymorphicTypeAdapter<PriorFunction>());
-    gb.registerTypeAdapter(OnlineAuc.class, new PolymorphicTypeAdapter<OnlineAuc>());
-    gb.registerTypeAdapter(Gradient.class, new PolymorphicTypeAdapter<Gradient>());
-    gb.registerTypeAdapter(CrossFoldLearner.class, new CrossFoldLearnerTypeAdapter());
-    gb.registerTypeAdapter(Vector.class, new VectorTypeAdapter());
-    gb.registerTypeAdapter(Matrix.class, new MatrixTypeAdapter());
-    gb.registerTypeAdapter(EvolutionaryProcess.class, new EvolutionaryProcessTypeAdapter());
-    gb.registerTypeAdapter(State.class, new StateTypeAdapter());
-    GSON = new ThreadLocal<Gson>() {
-      @Override
-      protected Gson initialValue() {
-        return gb.create();
-      }
-    };
-  }
-
   // static class ... don't instantiate
   private ModelSerializer() {
   }
 
+<<<<<<< HEAD
   public static Gson gson() {
     return GSON.get();
   }
 
   public static void writeJson(String path, OnlineLearner model) throws IOException {
     OutputStreamWriter out = new FileWriter(path);
+=======
+  public static void writeBinary(String path, CrossFoldLearner model) throws IOException {
+    DataOutputStream out = new DataOutputStream(new FileOutputStream(path));
+>>>>>>> refs/remotes/tdunning/lll
     try {
-      out.write(gson().toJson(model));
+      PolymorphicWritable.write(out, model);
     } finally {
       out.close();
     }
   }
 
+<<<<<<< HEAD
   /**
    * Reads a model in JSON format.
    *
@@ -378,16 +364,23 @@ public final class ModelSerializer {
       }
       r.add("population", v);
       return r;
+=======
+  public static void writeBinary(String path, AdjustableOnlineLearner model) throws IOException {
+    DataOutputStream out = new DataOutputStream(new FileOutputStream(path));
+    try {
+      PolymorphicWritable.write(out, model);
+    } finally {
+      out.close();
+>>>>>>> refs/remotes/tdunning/lll
     }
   }
 
-  public static double[] asArray(JsonObject v, String name) {
-    JsonArray x = v.get(name).getAsJsonArray();
-    double[] params = new double[x.size()];
-    int i = 0;
-    for (JsonElement element : x) {
-      params[i++] = element.getAsDouble();
+  public static <T extends Writable> T readBinary(InputStream in, Class<T> clazz) throws IOException {
+    DataInputStream dataIn = new DataInputStream(in);
+    try {
+      return PolymorphicWritable.read(dataIn, clazz);
+    } finally {
+      dataIn.close();
     }
-    return params;
   }
 }

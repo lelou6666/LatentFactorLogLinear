@@ -25,7 +25,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.mahout.clustering.spectral.common.AffinityMatrixInputJob;
 import org.apache.mahout.clustering.spectral.common.MatrixDiagonalizeJob;
@@ -58,12 +57,13 @@ public class EigencutsDriver extends AbstractJob {
   public int run(String[] arg0) throws Exception {
 
     // set up command line arguments
-    addOption("input", "i", "Path to input affinity matrix data", true);
-    addOption("output", "o", "Output of clusterings", true);
     addOption("half-life", "b", "Minimal half-life threshold", true);
     addOption("dimensions", "d", "Square dimensions of affinity matrix", true);
     addOption("epsilon", "e", "Half-life threshold coefficient", Double.toString(EPSILON_DEFAULT));
     addOption("tau", "t", "Threshold for cutting affinities", Double.toString(TAU_DEFAULT));
+    addOption("eigenrank", "k", "Number of top eigenvectors to use", true);
+    addOption(DefaultOptionCreator.inputOption().create());
+    addOption(DefaultOptionCreator.outputOption().create());
     addOption(DefaultOptionCreator.overwriteOption().create());
     Map<String, String> parsedArgs = parseArguments(arg0);
     if (parsedArgs == null) {
@@ -74,14 +74,15 @@ public class EigencutsDriver extends AbstractJob {
     Path input = new Path(parsedArgs.get("--input"));
     Path output = new Path(parsedArgs.get("--output"));
     if (hasOption(DefaultOptionCreator.OVERWRITE_OPTION)) {
-      HadoopUtil.overwriteOutput(output);
+      HadoopUtil.delete(getConf(), output);
     }
     int dimensions = Integer.parseInt(parsedArgs.get("--dimensions"));
     double halflife = Double.parseDouble(parsedArgs.get("--half-life"));
     double epsilon = Double.parseDouble(parsedArgs.get("--epsilon"));
     double tau = Double.parseDouble(parsedArgs.get("--tau"));
+    int eigenrank = Integer.parseInt(parsedArgs.get("--eigenrank"));
 
-    run(getConf(), input, output, dimensions, halflife, epsilon, tau);
+    run(getConf(), input, output, eigenrank, dimensions, halflife, epsilon, tau);
 
     return 0;
   }
@@ -92,6 +93,7 @@ public class EigencutsDriver extends AbstractJob {
    * @param conf the Configuration to use
    * @param input the Path to the directory containing input affinity tuples
    * @param output the Path to the output directory
+   * @param eigenrank The number of top eigenvectors/eigenvalues to use
    * @param dimensions the int number of dimensions of the square affinity matrix
    * @param halflife the double minimum half-life threshold
    * @param epsilon the double coefficient for setting minimum half-life threshold
@@ -101,6 +103,7 @@ public class EigencutsDriver extends AbstractJob {
                          Path input,
                          Path output,
                          int dimensions,
+                         int eigenrank,
                          double halflife,
                          double epsilon,
                          double tau)
@@ -123,15 +126,16 @@ public class EigencutsDriver extends AbstractJob {
       DistributedRowMatrix L =
           VectorMatrixMultiplicationJob.runJob(A.getRowPath(), D,
               new Path(outputCalc, "laplacian-" + (System.nanoTime() & 0xFF)));
-      L.configure(new JobConf(conf));
+      L.setConf(new Configuration(conf));
 
       // eigendecomposition (step 3)
-      int overshoot = (int) ((double) dimensions * OVERSHOOT_MULTIPLIER);
+      int overshoot = (int) ((double) eigenrank * OVERSHOOT_MULTIPLIER);
       List<Double> eigenValues = new ArrayList<Double>(overshoot);
-      Matrix eigenVectors = new DenseMatrix(overshoot, dimensions);
-      DistributedRowMatrix U = performEigenDecomposition(conf, L, dimensions, overshoot, eigenValues, eigenVectors, outputCalc);
-      U.configure(new JobConf(conf));
-      eigenValues = eigenValues.subList(0, dimensions);
+      Matrix eigenVectors = new DenseMatrix(overshoot, eigenrank);
+      DistributedRowMatrix U =
+          performEigenDecomposition(conf, L, eigenrank, overshoot, eigenValues, eigenVectors, outputCalc);
+      U.setConf(new Configuration(conf));
+      eigenValues = eigenValues.subList(0, eigenrank);
 
       // here's where things get interesting: steps 4, 5, and 6 are unique
       // to this algorithm, and depending on the final output, steps 1-3
@@ -151,8 +155,9 @@ public class EigencutsDriver extends AbstractJob {
       // how many cuts were made?
       if (numCuts > 0) {
         // recalculate A
-        A = new DistributedRowMatrix(input, new Path(outputTmp, Long.toString(System.nanoTime())), dimensions, dimensions);
-        A.configure(new JobConf());
+        A = new DistributedRowMatrix(input,
+                                     new Path(outputTmp, Long.toString(System.nanoTime())), dimensions, dimensions);
+        A.setConf(new Configuration());
       }
     } while (numCuts > 0);
 

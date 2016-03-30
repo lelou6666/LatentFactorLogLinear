@@ -20,12 +20,19 @@ package org.apache.mahout.cf.taste.impl.model;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Iterators;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
+import org.apache.mahout.common.iterator.CountingIterator;
 
 /**
+ * <p>
+ * Like {@link GenericItemPreferenceArray} but stores preferences for one user (all user IDs the same) rather
+ * than one item.
+ * </p>
+ *
  * <p>
  * This implementation maintains two parallel arrays, of user IDs and values. The idea is to save allocating
  * {@link Preference} objects themselves. This saves the overhead of {@link Preference} objects but also
@@ -52,17 +59,23 @@ public final class GenericUserPreferenceArray implements PreferenceArray {
     this.id = Long.MIN_VALUE; // as a sort of 'unspecified' value
   }
   
-  public GenericUserPreferenceArray(List<Preference> prefs) {
+  public GenericUserPreferenceArray(List<? extends Preference> prefs) {
     this(prefs.size());
     int size = prefs.size();
+    long userID = Long.MIN_VALUE;
     for (int i = 0; i < size; i++) {
       Preference pref = prefs.get(i);
+      if (i == 0) {
+        userID = pref.getUserID();
+      } else {
+        if (userID != pref.getUserID()) {
+          throw new IllegalArgumentException("Not all user IDs are the same");
+        }
+      }
       ids[i] = pref.getItemID();
       values[i] = pref.getValue();
     }
-    if (size > 0) {
-      id = prefs.get(0).getUserID();
-    }
+    id = userID;
   }
   
   /**
@@ -236,11 +249,20 @@ public final class GenericUserPreferenceArray implements PreferenceArray {
   
   @Override
   public Iterator<Preference> iterator() {
-    return new PreferenceArrayIterator();
+    return Iterators.transform(new CountingIterator(length()),
+                               new Function<Integer, Preference>() {
+                                 @Override
+                                 public Preference apply(Integer from) {
+                                   return new PreferenceView(from);
+                                 }
+                               });
   }
 
   @Override
   public String toString() {
+    if (ids == null || ids.length == 0) {
+      return "GenericUserPreferenceArray[{}]";
+    }
     StringBuilder result = new StringBuilder(20 * ids.length);
     result.append("GenericUserPreferenceArray[userID:");
     result.append(id);
@@ -256,29 +278,7 @@ public final class GenericUserPreferenceArray implements PreferenceArray {
     result.append("}]");
     return result.toString();
   }
-  
-  private final class PreferenceArrayIterator implements Iterator<Preference> {
-    private int i;
-    
-    @Override
-    public boolean hasNext() {
-      return i < length();
-    }
-    
-    @Override
-    public Preference next() {
-      if (i >= length()) {
-        throw new NoSuchElementException();
-      }
-      return new PreferenceView(i++);
-    }
-    
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
-  }
-  
+
   private final class PreferenceView implements Preference {
     
     private final int i;

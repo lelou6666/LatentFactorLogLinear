@@ -55,6 +55,7 @@ public class MatrixVectorView extends AbstractVector {
    * @return true iff the {@link Vector} implementation should be considered
    *         dense -- that it explicitly represents every value
    */
+  @Override
   public boolean isDense() {
     return true;
   }
@@ -64,26 +65,30 @@ public class MatrixVectorView extends AbstractVector {
    *         index order in an efficient way. In particular this implies that {@link #iterator()} and
    *         {@link #iterateNonZero()} return elements in ascending order by index.
    */
+  @Override
   public boolean isSequentialAccess() {
     return true;
   }
 
   /**
    * Iterates over all elements <p/> * NOTE: Implementations may choose to reuse the Element returned
-   * for performance reasons, so if you need a copy of it, you should call {@link #getElement} for
+   * for performance reasons, so if you need a copy of it, you should call {@link #getElement(int)} for
    * the given index
    *
    * @return An {@link java.util.Iterator} over all elements
    */
+  @Override
   public Iterator<Element> iterator() {
     final LocalElement r = new LocalElement(0);
     return new Iterator<Element>() {
       private int i;
 
+      @Override
       public boolean hasNext() {
         return i < size();
       }
 
+      @Override
       public Element next() {
         if (i >= size()) {
           throw new NoSuchElementException();
@@ -92,6 +97,7 @@ public class MatrixVectorView extends AbstractVector {
         return r;
       }
 
+      @Override
       public void remove() {
         throw new UnsupportedOperationException("Can't remove from a view");
       }
@@ -101,10 +107,11 @@ public class MatrixVectorView extends AbstractVector {
   /**
    * Iterates over all non-zero elements. <p/> NOTE: Implementations may choose to reuse the Element
    * returned for performance reasons, so if you need a copy of it, you should call {@link
-   * #getElement} for the given index
+   * #getElement(int)} for the given index
    *
    * @return An {@link java.util.Iterator} over all non-zero elements
    */
+  @Override
   public Iterator<Element> iterateNonZero() {
     return iterator();
   }
@@ -115,6 +122,7 @@ public class MatrixVectorView extends AbstractVector {
    * @param index an int index
    * @return the double at the index
    */
+  @Override
   public double getQuick(int index) {
     return matrix.getQuick(row + rowStride * index, column + columnStride * index);
   }
@@ -124,6 +132,7 @@ public class MatrixVectorView extends AbstractVector {
    *
    * @return a Vector
    */
+  @Override
   public Vector like() {
     return matrix.like(size(), 1).viewColumn(0);
   }
@@ -134,6 +143,7 @@ public class MatrixVectorView extends AbstractVector {
    * @param index an int index into the receiver
    * @param value a double value to set
    */
+  @Override
   public void setQuick(int index, double value) {
     matrix.setQuick(row + rowStride * index, column + columnStride * index, value);
   }
@@ -143,6 +153,7 @@ public class MatrixVectorView extends AbstractVector {
    *
    * @return an int
    */
+  @Override
   public int getNumNondefaultElements() {
     return size();
   }

@@ -22,9 +22,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 
@@ -41,7 +41,7 @@ import org.apache.mahout.cf.taste.impl.model.GenericUserPreferenceArray;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.Preference;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
-import org.apache.mahout.common.FileLineIterator;
+import org.apache.mahout.common.iterator.FileLineIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,6 +120,7 @@ public class FileDataModel extends AbstractDataModel {
 
   public static final long DEFAULT_MIN_RELOAD_INTERVAL_MS = 60 * 1000L; // 1 minute?
   private static final char COMMENT_CHAR = '#';
+  private static final char[] DELIMIETERS = {',', '\t'};
 
   private final File dataFile;
   private long lastModified;
@@ -150,7 +151,7 @@ public class FileDataModel extends AbstractDataModel {
    *          transposes user IDs and item IDs -- convenient for 'flipping' the data model this way
    * @param minReloadIntervalMS
    *  the minimum interval in milliseconds after which a full reload of the original datafile is done
-   * 	when refresh() is called
+   *  when refresh() is called
    * @see #FileDataModel(File)
    */
   public FileDataModel(File dataFile, boolean transpose, long minReloadIntervalMS) throws IOException {
@@ -158,6 +159,7 @@ public class FileDataModel extends AbstractDataModel {
     if (!dataFile.exists() || dataFile.isDirectory()) {
       throw new FileNotFoundException(dataFile.toString());
     }
+    Preconditions.checkArgument(dataFile.length() > 0L, "dataFile is empty");
     Preconditions.checkArgument(minReloadIntervalMS >= 0L, "minReloadIntervalMs must be non-negative");
 
     log.info("Creating FileDataModel for file {}", dataFile);
@@ -214,6 +216,7 @@ public class FileDataModel extends AbstractDataModel {
 
     boolean loadFreshData = (delegate == null) || (newLastModified > lastModified + minReloadIntervalMS);
 
+    long oldLastUpdateFileModifieid = lastUpdateFileModified;
     lastModified = newLastModified;
     lastUpdateFileModified = newLastUpdateFileModified;
 
@@ -227,7 +230,7 @@ public class FileDataModel extends AbstractDataModel {
         FileLineIterator iterator = new FileLineIterator(dataFile, false);
         processFile(iterator, data, timestamps, false);
 
-        for (File updateFile : findUpdateFiles()) {
+        for (File updateFile : findUpdateFilesAfter(newLastModified)) {
           processFile(new FileLineIterator(updateFile, false), data, timestamps, false);
         }
 
@@ -237,7 +240,7 @@ public class FileDataModel extends AbstractDataModel {
 
         FastByIDMap<PreferenceArray> rawData = ((GenericDataModel) delegate).getRawUserData();
 
-        for (File updateFile : findUpdateFiles()) {
+        for (File updateFile : findUpdateFilesAfter(Math.max(oldLastUpdateFileModifieid, newLastModified))) {
           processFile(new FileLineIterator(updateFile, false), rawData, timestamps, true);
         }
 
@@ -253,7 +256,7 @@ public class FileDataModel extends AbstractDataModel {
         FileLineIterator iterator = new FileLineIterator(dataFile, false);
         processFileWithoutID(iterator, data, timestamps);
 
-        for (File updateFile : findUpdateFiles()) {
+        for (File updateFile : findUpdateFilesAfter(newLastModified)) {
           processFileWithoutID(new FileLineIterator(updateFile, false), data, timestamps);
         }
 
@@ -263,7 +266,7 @@ public class FileDataModel extends AbstractDataModel {
 
         FastByIDMap<FastIDSet> rawData = ((GenericBooleanPrefDataModel) delegate).getRawUserData();
 
-        for (File updateFile : findUpdateFiles()) {
+        for (File updateFile : findUpdateFilesAfter(Math.max(oldLastUpdateFileModifieid, newLastModified))) {
           processFileWithoutID(new FileLineIterator(updateFile, false), rawData, timestamps);
         }
 
@@ -280,36 +283,36 @@ public class FileDataModel extends AbstractDataModel {
    * data file is /foo/data.txt.gz, you might place update files at /foo/data.1.txt.gz, /foo/data.2.txt.gz,
    * etc.
    */
-  private Iterable<File> findUpdateFiles() {
+  private Iterable<File> findUpdateFilesAfter(long minimumLastModified) {
     String dataFileName = dataFile.getName();
     int period = dataFileName.indexOf('.');
     String startName = period < 0 ? dataFileName : dataFileName.substring(0, period);
     File parentDir = dataFile.getParentFile();
-    List<File> updateFiles = new ArrayList<File>();
+    Map<Long, File> modTimeToUpdateFile = new TreeMap<Long,File>();
     for (File updateFile : parentDir.listFiles()) {
       String updateFileName = updateFile.getName();
-      if (updateFileName.startsWith(startName) && !updateFileName.equals(dataFileName)) {
-        updateFiles.add(updateFile);
+      if (updateFileName.startsWith(startName)
+          && !updateFileName.equals(dataFileName)
+          && updateFile.lastModified() >= minimumLastModified) {
+        modTimeToUpdateFile.put(updateFile.lastModified(), updateFile);
       }
     }
-    Collections.sort(updateFiles);
-    return updateFiles;
+    return modTimeToUpdateFile.values();
   }
 
   private long readLastUpdateFileModified() {
     long mostRecentModification = Long.MIN_VALUE;
-    for (File updateFile : findUpdateFiles()) {
+    for (File updateFile : findUpdateFilesAfter(0L)) {
       mostRecentModification = Math.max(mostRecentModification, updateFile.lastModified());
     }
     return mostRecentModification;
   }
 
   public static char determineDelimiter(String line) {
-    if (line.indexOf(',') >= 0) {
-      return ',';
-    }
-    if (line.indexOf('\t') >= 0) {
-      return '\t';
+    for (char possibleDelimieter : DELIMIETERS) {
+      if (line.indexOf(possibleDelimieter) >= 0) {
+        return possibleDelimieter;
+      }
     }
     throw new IllegalArgumentException("Did not find a delimiter in first line");
   }
@@ -337,8 +340,8 @@ public class FileDataModel extends AbstractDataModel {
    * Reads one line from the input file and adds the data to a {@link FastByIDMap} data structure which maps user IDs
    * to preferences. This assumes that each line of the input file corresponds to one preference. After
    * reading a line and determining which user and item the preference pertains to, the method should look to
-   * see if the data contains a mapping for the user ID already, and if not, add an empty {@link List} of
-   * {@link Preference}s to the data.
+   * see if the data contains a mapping for the user ID already, and if not, add an empty data structure of preferences
+   * as appropriate to the data.
    * </p>
    *
    * <p>
@@ -365,7 +368,9 @@ public class FileDataModel extends AbstractDataModel {
       return;
     }
 
-    String[] tokens = delimiterPattern.split(line);
+    // Consume up to 4 tokens, and gather whatever is left in an unused 5th token:
+    String[] tokens = delimiterPattern.split(line, 5);
+
     Preconditions.checkArgument(tokens.length >= 3, "Bad line: %s", line);
 
     String userIDString = tokens[0];

@@ -17,10 +17,10 @@
 
 package org.apache.mahout.math;
 
+import com.google.common.collect.AbstractIterator;
 import org.apache.mahout.math.function.Functions;
 
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 /**
  * <p>
@@ -136,6 +136,7 @@ public class SequentialAccessSparseVector extends AbstractVector {
   /**
    * @return false
    */
+  @Override
   public boolean isDense() {
     return false;
   }
@@ -143,31 +144,38 @@ public class SequentialAccessSparseVector extends AbstractVector {
   /**
    * @return true
    */
+  @Override
   public boolean isSequentialAccess() {
     return true;
   }
 
+  @Override
   public double getQuick(int index) {
     return values.get(index);
   }
 
+  @Override
   public void setQuick(int index, double value) {
     lengthSquared = -1;
     values.set(index, value);
   }
 
+  @Override
   public int getNumNondefaultElements() {
     return values.getNumMappings();
   }
 
+  @Override
   public SequentialAccessSparseVector like() {
     return new SequentialAccessSparseVector(size(), values.getNumMappings());
   }
 
+  @Override
   public Iterator<Element> iterateNonZero() {
     return new NonDefaultIterator();
   }
 
+  @Override
   public Iterator<Element> iterator() {
     return new AllIterator();
   }
@@ -241,48 +249,36 @@ public class SequentialAccessSparseVector extends AbstractVector {
   }
 
 
-  private final class NonDefaultIterator implements Iterator<Element> {
+  private final class NonDefaultIterator extends AbstractIterator<Element> {
 
     private final NonDefaultElement element = new NonDefaultElement();
 
-    public boolean hasNext() {
+    @Override
+    protected Element computeNext() {
       int numMappings = values.getNumMappings();
-      return numMappings > 0 && element.getNextOffset() < numMappings;
-    }
-
-    public Element next() {
-      if (!hasNext()) {
-        throw new NoSuchElementException();
+      if (numMappings <= 0 || element.getNextOffset() >= numMappings) {
+        return endOfData();
       }
       element.advanceOffset();
       return element;
     }
 
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
   }
 
-  private final class AllIterator implements Iterator<Element> {
+  private final class AllIterator extends AbstractIterator<Element> {
 
     private final AllElement element = new AllElement();
 
-    public boolean hasNext() {
+    @Override
+    protected Element computeNext() {
       int numMappings = values.getNumMappings();
-      return numMappings > 0 && element.getNextIndex() <= values.getIndices()[numMappings - 1];
-    }
-
-    public Element next() {
-      if (!hasNext()) {
-        throw new NoSuchElementException();
+      if (numMappings <= 0 || element.getNextIndex() > values.getIndices()[numMappings - 1]) {
+        return endOfData();
       }
       element.advanceIndex();
       return element;
     }
 
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
   }
 
   private final class NonDefaultElement implements Element {
@@ -297,14 +293,17 @@ public class SequentialAccessSparseVector extends AbstractVector {
       return offset + 1;
     }
 
+    @Override
     public double get() {
       return values.getValues()[offset];
     }
 
+    @Override
     public int index() {
       return values.getIndices()[offset];
     }
 
+    @Override
     public void set(double value) {
       lengthSquared = -1;      
       values.getValues()[offset] = value;
@@ -327,6 +326,7 @@ public class SequentialAccessSparseVector extends AbstractVector {
       return index + 1;
     }
 
+    @Override
     public double get() {
       if (index == values.getIndices()[nextOffset]) {
         return values.getValues()[nextOffset];
@@ -334,10 +334,12 @@ public class SequentialAccessSparseVector extends AbstractVector {
       return OrderedIntDoubleMapping.DEFAULT_VALUE;
     }
 
+    @Override
     public int index() {
       return index;
     }
 
+    @Override
     public void set(double value) {
       lengthSquared = -1;      
       if (index == values.getIndices()[nextOffset]) {

@@ -45,15 +45,37 @@ public class CanopyClusterer {
   // the T2 distance threshold
   private double t2;
 
+  // the T3 distance threshold
+  private double t3;
+
+  // the T4 distance threshold
+  private double t4;
+
   // the distance measure
   private DistanceMeasure measure;
-
-  // private int nextClusterId = 0;
 
   public CanopyClusterer(DistanceMeasure measure, double t1, double t2) {
     this.t1 = t1;
     this.t2 = t2;
+    this.t3 = t1;
+    this.t4 = t2;
     this.measure = measure;
+  }
+
+  public double getT1() {
+    return t1;
+  }
+
+  public double getT2() {
+    return t2;
+  }
+
+  public double getT3() {
+    return t3;
+  }
+
+  public double getT4() {
+    return t4;
   }
 
   public CanopyClusterer(Configuration config) {
@@ -64,7 +86,7 @@ public class CanopyClusterer {
    * Configure the Canopy and its distance measure
    * 
    * @param configuration
-   *          the JobConf for this job
+   *            the Configuration
    */
   public void configure(Configuration configuration) {
     try {
@@ -81,40 +103,70 @@ public class CanopyClusterer {
     }
     t1 = Double.parseDouble(configuration.get(CanopyConfigKeys.T1_KEY));
     t2 = Double.parseDouble(configuration.get(CanopyConfigKeys.T2_KEY));
+    t3 = t1;
+    String d = configuration.get(CanopyConfigKeys.T3_KEY);
+    if (d != null) {
+      t3 = Double.parseDouble(d);
+    }
+    t4 = t2;
+    d = configuration.get(CanopyConfigKeys.T4_KEY);
+    if (d != null) {
+      t4 = Double.parseDouble(d);
+    }
     nextCanopyId = 0;
   }
 
-  /** Configure the Canopy for unit tests */
+  /**
+   * Used by CanopyReducer to set t1=t3 and t2=t4 configuration values
+   */
+  public void useT3T4() {
+    t1 = t3;
+    t2 = t4;
+  }
+
+  /**
+   * Configure the Canopy for unit tests
+   * 
+   * @param aMeasure
+   *            the DistanceMeasure
+   * @param aT1
+   *            the T1 distance threshold
+   * @param aT2
+   *            the T2 distance threshold
+   * */
   public void config(DistanceMeasure aMeasure, double aT1, double aT2) {
     measure = aMeasure;
     t1 = aT1;
     t2 = aT2;
+    t3 = t1;
+    t4 = t2;
   }
 
   /**
-   * This is the same algorithm as the reference but inverted to iterate over existing canopies instead of the
-   * points. Because of this it does not need to actually store the points, instead storing a total points
-   * vector and the number of points. From this a centroid can be computed.
+   * This is the same algorithm as the reference but inverted to iterate over
+   * existing canopies instead of the points. Because of this it does not need
+   * to actually store the points, instead storing a total points vector and
+   * the number of points. From this a centroid can be computed.
    * <p/>
    * This method is used by the CanopyMapper, CanopyReducer and CanopyDriver.
    * 
    * @param point
-   *          the point to be added
+   *            the point to be added
    * @param canopies
-   *          the List<Canopy> to be appended
+   *            the List<Canopy> to be appended
    */
   public void addPointToCanopies(Vector point, Collection<Canopy> canopies) {
     boolean pointStronglyBound = false;
     for (Canopy canopy : canopies) {
       double dist = measure.distance(canopy.getCenter().getLengthSquared(), canopy.getCenter(), point);
       if (dist < t1) {
-        log.debug("Added point: " + AbstractCluster.formatVector(point, null) + " to canopy: " + canopy.getIdentifier());
+        log.debug("Added point: {} to canopy: {}", AbstractCluster.formatVector(point, null), canopy.getIdentifier());
         canopy.observe(point);
       }
       pointStronglyBound = pointStronglyBound || (dist < t2);
     }
     if (!pointStronglyBound) {
-      log.debug("Created new Canopy:" + nextCanopyId + " at center:" + AbstractCluster.formatVector(point, null));
+      log.debug("Created new Canopy:{} at center:{}", nextCanopyId, AbstractCluster.formatVector(point, null));
       canopies.add(new Canopy(point, nextCanopyId++, measure));
     }
   }
@@ -149,7 +201,7 @@ public class CanopyClusterer {
    * Return if the point is covered by the canopy
    * 
    * @param point
-   *          a point
+   *            a point
    * @return if the point is covered
    */
   public boolean canopyCovers(Canopy canopy, Vector point) {
@@ -160,24 +212,29 @@ public class CanopyClusterer {
    * Iterate through the points, adding new canopies. Return the canopies.
    * 
    * @param points
-   *          a list<Vector> defining the points to be clustered
+   *            a list<Vector> defining the points to be clustered
    * @param measure
-   *          a DistanceMeasure to use
+   *            a DistanceMeasure to use
    * @param t1
-   *          the T1 distance threshold
+   *            the T1 distance threshold
    * @param t2
-   *          the T2 distance threshold
+   *            the T2 distance threshold
    * @return the List<Canopy> created
    */
-  public static List<Canopy> createCanopies(List<Vector> points, DistanceMeasure measure, double t1, double t2) {
+  public static List<Canopy> createCanopies(List<Vector> points,
+                                            DistanceMeasure measure,
+                                            double t1,
+                                            double t2) {
     List<Canopy> canopies = new ArrayList<Canopy>();
     /**
-     * Reference Implementation: Given a distance metric, one can create canopies as follows: Start with a
-     * list of the data points in any order, and with two distance thresholds, T1 and T2, where T1 > T2.
-     * (These thresholds can be set by the user, or selected by cross-validation.) Pick a point on the list
-     * and measure its distance to all other points. Put all points that are within distance threshold T1 into
-     * a canopy. Remove from the list all points that are within distance threshold T2. Repeat until the list
-     * is empty.
+     * Reference Implementation: Given a distance metric, one can create
+     * canopies as follows: Start with a list of the data points in any
+     * order, and with two distance thresholds, T1 and T2, where T1 > T2.
+     * (These thresholds can be set by the user, or selected by
+     * cross-validation.) Pick a point on the list and measure its distance
+     * to all other points. Put all points that are within distance
+     * threshold T1 into a canopy. Remove from the list all points that are
+     * within distance threshold T2. Repeat until the list is empty.
      */
     int nextCanopyId = 0;
     while (!points.isEmpty()) {
@@ -189,11 +246,13 @@ public class CanopyClusterer {
       while (ptIter.hasNext()) {
         Vector p2 = ptIter.next();
         double dist = measure.distance(p1, p2);
-        // Put all points that are within distance threshold T1 into the canopy
+        // Put all points that are within distance threshold T1 into the
+        // canopy
         if (dist < t1) {
           canopy.observe(p2);
         }
-        // Remove from the list all points that are within distance threshold T2
+        // Remove from the list all points that are within distance
+        // threshold T2
         if (dist < t2) {
           ptIter.remove();
         }
@@ -209,7 +268,7 @@ public class CanopyClusterer {
    * Iterate through the canopies, adding their centroids to a list
    * 
    * @param canopies
-   *          a List<Canopy>
+   *            a List<Canopy>
    * @return the List<Vector>
    */
   public static List<Vector> getCenters(Iterable<Canopy> canopies) {
@@ -224,7 +283,7 @@ public class CanopyClusterer {
    * Iterate through the canopies, resetting their center to their centroids
    * 
    * @param canopies
-   *          a List<Canopy>
+   *            a List<Canopy>
    */
   public static void updateCentroids(Iterable<Canopy> canopies) {
     for (Canopy canopy : canopies) {

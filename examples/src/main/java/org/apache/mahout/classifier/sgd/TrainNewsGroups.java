@@ -17,12 +17,14 @@
 
 package org.apache.mahout.classifier.sgd;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Ordering;
+import com.google.common.io.Files;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -34,7 +36,7 @@ import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.function.Functions;
-import org.apache.mahout.math.function.UnaryFunction;
+import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.vectorizer.encoders.ConstantValueEncoder;
 import org.apache.mahout.vectorizer.encoders.Dictionary;
 import org.apache.mahout.vectorizer.encoders.FeatureVectorEncoder;
@@ -42,7 +44,6 @@ import org.apache.mahout.vectorizer.encoders.StaticWordValueEncoder;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
@@ -118,10 +119,13 @@ public final class TrainNewsGroups {
     new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss")
   };
 
-  private static Analyzer analyzer = new StandardAnalyzer(Version.LUCENE_30);
-  private static FeatureVectorEncoder encoder = new StaticWordValueEncoder("body");
-  private static FeatureVectorEncoder bias = new ConstantValueEncoder("Intercept");
+  private static final Analyzer analyzer = new StandardAnalyzer(Version.LUCENE_30);
+  private static final FeatureVectorEncoder encoder = new StaticWordValueEncoder("body");
+  private static final FeatureVectorEncoder bias = new ConstantValueEncoder("Intercept");
   private static Multiset<String> overallCounts;
+
+  private TrainNewsGroups() {
+  }
 
   public static void main(String[] args) throws IOException {
     File base = new File(args[0]);
@@ -137,7 +141,7 @@ public final class TrainNewsGroups {
 
     encoder.setProbes(2);
     AdaptiveLogisticRegression learningAlgorithm = new AdaptiveLogisticRegression(20, FEATURES, new L1());
-    learningAlgorithm.setInterval(800);
+    learningAlgorithm.setInterval(1300);
     learningAlgorithm.setAveragingWindow(500);
 
     List<File> files = Lists.newArrayList();
@@ -156,7 +160,7 @@ public final class TrainNewsGroups {
     int k = 0;
     double step = 0;
     int[] bumps = {1, 2, 5};
-    for (File file : files.subList(0, 10000)) {
+    for (File file : files.subList(0, 3000)) {
       String ng = file.getParentFile().getName();
       int actual = newsGroups.intern(ng);
 
@@ -167,7 +171,7 @@ public final class TrainNewsGroups {
 
       int bump = bumps[(int) Math.floor(step) % bumps.length];
       int scale = (int) Math.pow(10, Math.floor(step / bumps.length));
-      State<AdaptiveLogisticRegression.Wrapper> best = learningAlgorithm.getBest();
+      State<AdaptiveLogisticRegression.Wrapper, CrossFoldLearner> best = learningAlgorithm.getBest();
       double maxBeta;
       double nonZeros;
       double positive;
@@ -181,19 +185,19 @@ public final class TrainNewsGroups {
         averageCorrect = state.percentCorrect();
         averageLL = state.logLikelihood();
 
-        OnlineLogisticRegression model = state.getModels().get(0);
+        OnlineLogisticRegression model = (OnlineLogisticRegression) state.getModels().get(0);
         // finish off pending regularization
         model.close();
         
         Matrix beta = model.getBeta();
         maxBeta = beta.aggregate(Functions.MAX, Functions.ABS);
-        nonZeros = beta.aggregate(Functions.PLUS, new UnaryFunction() {
+        nonZeros = beta.aggregate(Functions.PLUS, new DoubleFunction() {
           @Override
           public double apply(double v) {
             return Math.abs(v) > 1.0e-6 ? 1 : 0;
           }
         });
-        positive = beta.aggregate(Functions.PLUS, new UnaryFunction() {
+        positive = beta.aggregate(Functions.PLUS, new DoubleFunction() {
           @Override
           public double apply(double v) {
             return v > 0 ? 1 : 0;
@@ -211,7 +215,12 @@ public final class TrainNewsGroups {
       }
       if (k % (bump * scale) == 0) {
         if (learningAlgorithm.getBest() != null) {
+<<<<<<< HEAD
           ModelSerializer.writeJson("/tmp/news-group-" + k + ".model", learningAlgorithm.getBest().getPayload().getLearner());
+=======
+          ModelSerializer.writeBinary("/tmp/news-group-" + k + ".model",
+                                      learningAlgorithm.getBest().getPayload().getLearner().getModels().get(0));
+>>>>>>> refs/remotes/tdunning/lll
         }
 
         step += 0.25;
@@ -224,7 +233,12 @@ public final class TrainNewsGroups {
     dissect(leakType, newsGroups, learningAlgorithm, files);
     System.out.println("exiting main");
 
+<<<<<<< HEAD
     ModelSerializer.writeJson("/tmp/news-group.model", learningAlgorithm);
+=======
+    ModelSerializer.writeBinary("/tmp/news-group.model",
+                                learningAlgorithm.getBest().getPayload().getLearner().getModels().get(0));
+>>>>>>> refs/remotes/tdunning/lll
 
     List<Integer> counts = Lists.newArrayList();
     System.out.printf("Word counts\n");
@@ -267,8 +281,14 @@ public final class TrainNewsGroups {
     List<String> ngNames = Lists.newArrayList(newsGroups.values());
     List<ModelDissector.Weight> weights = md.summary(100);
     for (ModelDissector.Weight w : weights) {
+<<<<<<< HEAD
       System.out.printf("%s\t%.1f\t%s\t%.1f\t%s\t%.1f\t%s\n", w.getFeature(), w.getWeight(), ngNames.get(w.getMaxImpact() + 1),
         w.getCategory(1), w.getWeight(1), w.getCategory(2), w.getWeight(2));
+=======
+      System.out.printf("%s\t%.1f\t%s\t%.1f\t%s\t%.1f\t%s\n",
+        w.getFeature(), w.getWeight(), ngNames.get(w.getMaxImpact() + 1),
+        w.getWeight(1), ngNames.get(w.getCategory(1)), w.getWeight(2), ngNames.get(w.getCategory(2)));
+>>>>>>> refs/remotes/tdunning/lll
     }
   }
 
@@ -276,7 +296,7 @@ public final class TrainNewsGroups {
     long date = (long) (1000 * (DATE_REFERENCE + actual * MONTH + 1 * WEEK * rand.nextDouble()));
     Multiset<String> words = ConcurrentHashMultiset.create();
 
-    BufferedReader reader = new BufferedReader(new FileReader(file));
+    BufferedReader reader = Files.newReader(file, Charsets.UTF_8);
     try {
       String line = reader.readLine();
       Reader dateString = new StringReader(DATE_FORMATS[leakType % 3].format(new Date(date)));
@@ -291,7 +311,7 @@ public final class TrainNewsGroups {
             countWords(analyzer, words, in);
           }
           line = reader.readLine();
-        } while (line.startsWith(" "));
+        } while (line != null && line.startsWith(" "));
       }
       if (leakType < 3) {
         countWords(analyzer, words, reader);

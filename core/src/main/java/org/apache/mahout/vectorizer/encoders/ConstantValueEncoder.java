@@ -22,9 +22,9 @@ import org.apache.mahout.math.Vector;
 /**
  * An encoder that does the standard thing for a virtual bias term.
  */
-public class ConstantValueEncoder extends FeatureVectorEncoder {
+public class ConstantValueEncoder extends CachingValueEncoder {
   public ConstantValueEncoder(String name) {
-    super(name);
+    super(name, 0);
   }
 
   @Override
@@ -33,7 +33,7 @@ public class ConstantValueEncoder extends FeatureVectorEncoder {
     String name = getName();
     for (int i = 0; i < probes; i++) {
       int n = hashForProbe(originalForm, data.size(), name, i);
-      if(isTraceEnabled()){
+      if (isTraceEnabled()) {
         trace((String) null, n);                
       }
       data.set(n, data.get(n) + getWeight(originalForm,weight));
@@ -51,8 +51,7 @@ public class ConstantValueEncoder extends FeatureVectorEncoder {
   }
 
   @Override
-  protected int hashForProbe(byte[] originalForm, int dataSize, String name, int probe){
-    return hash(name, probe, dataSize);
+  protected int getSeed() {
+    return 0;
   }
-
 }

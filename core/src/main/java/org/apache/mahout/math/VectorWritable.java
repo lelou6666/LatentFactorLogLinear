@@ -46,7 +46,7 @@ public final class VectorWritable extends Configured implements Writable {
   }
 
   /**
-   * @return {@link Vector} that this {@link VectorWritable} is to write, or has
+   * @return {@link Vector} that this is to write, or has
    *  just read
    */
   public Vector get() {
@@ -58,7 +58,7 @@ public final class VectorWritable extends Configured implements Writable {
   }
 
   /**
-   * @return true if this {@link VectorWritable} is allowed to encode {@link Vector}
+   * @return true if this is allowed to encode {@link Vector}
    *  values using fewer bytes, possibly losing precision. In particular this means
    *  that floating point values will be encoded as floats, not doubles.
    */
@@ -72,58 +72,7 @@ public final class VectorWritable extends Configured implements Writable {
 
   @Override
   public void write(DataOutput out) throws IOException {
-
-    boolean dense = vector.isDense();
-    boolean sequential = vector.isSequentialAccess();
-    boolean named = vector instanceof NamedVector;
-
-    boolean writesLaxPrecision = this.writesLaxPrecision;
-    out.writeByte((dense ? FLAG_DENSE : 0)
-        | (sequential ? FLAG_SEQUENTIAL : 0)
-        | (named ? FLAG_NAMED : 0)
-        | (writesLaxPrecision ? FLAG_LAX_PRECISION : 0));
-
-    Varint.writeUnsignedVarInt(vector.size(), out);
-    if (dense) {
-      for (Vector.Element element : vector) {
-        if (writesLaxPrecision) {
-          out.writeFloat((float) element.get());
-        } else {
-          out.writeDouble(element.get());
-        }
-      }
-    } else {
-      Varint.writeUnsignedVarInt(vector.getNumNondefaultElements(), out);
-      Iterator<Vector.Element> iter = vector.iterateNonZero();
-      if (sequential) {
-        int lastIndex = 0;
-        while (iter.hasNext()) {
-          Vector.Element element = iter.next();
-          int thisIndex = element.index();
-          // Delta-code indices:
-          Varint.writeUnsignedVarInt(thisIndex - lastIndex, out);
-          lastIndex = thisIndex;
-          if (writesLaxPrecision) {
-            out.writeFloat((float) element.get());
-          } else {
-            out.writeDouble(element.get());
-          }
-        }
-      } else {
-        while (iter.hasNext()) {
-          Vector.Element element = iter.next();
-          Varint.writeUnsignedVarInt(element.index(), out);
-          if (writesLaxPrecision) {
-            out.writeFloat((float) element.get());
-          } else {
-            out.writeDouble(element.get());
-          }
-        }
-      }
-    }
-    if (named) {
-      out.writeUTF(((NamedVector) vector).getName());
-    }
+    writeVector(out, this.vector, this.writesLaxPrecision);
   }
 
   @Override
@@ -174,7 +123,65 @@ public final class VectorWritable extends Configured implements Writable {
 
   /** Write the vector to the output */
   public static void writeVector(DataOutput out, Vector vector) throws IOException {
-    new VectorWritable(vector).write(out);
+    writeVector(out, vector, false);
+  }
+  
+  public static void writeVector(DataOutput out, Vector vector, boolean laxPrecision) throws IOException {
+    boolean dense = vector.isDense();
+    boolean sequential = vector.isSequentialAccess();
+    boolean named = vector instanceof NamedVector;
+
+    out.writeByte((dense ? FLAG_DENSE : 0)
+        | (sequential ? FLAG_SEQUENTIAL : 0)
+        | (named ? FLAG_NAMED : 0)
+        | (laxPrecision ? FLAG_LAX_PRECISION : 0));
+
+    Varint.writeUnsignedVarInt(vector.size(), out);
+    if (dense) {
+      for (Vector.Element element : vector) {
+        if (laxPrecision) {
+          out.writeFloat((float) element.get());
+        } else {
+          out.writeDouble(element.get());
+        }
+      }
+    } else {
+      Varint.writeUnsignedVarInt(vector.getNumNondefaultElements(), out);
+      Iterator<Vector.Element> iter = vector.iterateNonZero();
+      if (sequential) {
+        int lastIndex = 0;
+        while (iter.hasNext()) {
+          Vector.Element element = iter.next();
+          int thisIndex = element.index();
+          // Delta-code indices:
+          Varint.writeUnsignedVarInt(thisIndex - lastIndex, out);
+          lastIndex = thisIndex;
+          if (laxPrecision) {
+            out.writeFloat((float) element.get());
+          } else {
+            out.writeDouble(element.get());
+          }
+        }
+      } else {
+        while (iter.hasNext()) {
+          Vector.Element element = iter.next();
+          Varint.writeUnsignedVarInt(element.index(), out);
+          if (laxPrecision) {
+            out.writeFloat((float) element.get());
+          } else {
+            out.writeDouble(element.get());
+          }
+        }
+      }
+    }
+    if (named) {
+      out.writeUTF(((NamedVector) vector).getName());
+    }
   }
 
+  public static Vector readVector(DataInput in) throws IOException {
+    VectorWritable v = new VectorWritable();
+    v.readFields(in);
+    return v.get();
+  }
 }
