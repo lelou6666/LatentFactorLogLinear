@@ -27,8 +27,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.mahout.cf.taste.common.Refreshable;
 import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.common.Weighting;
-import org.apache.mahout.cf.taste.impl.common.CompactRunningAverage;
-import org.apache.mahout.cf.taste.impl.common.CompactRunningAverageAndStdDev;
 import org.apache.mahout.cf.taste.impl.common.FastByIDMap;
 import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.impl.common.FullRunningAverage;
@@ -59,7 +57,6 @@ public final class MemoryDiffStorage implements DiffStorage {
   
   private final DataModel dataModel;
   private final boolean stdDevWeighted;
-  private final boolean compactAverages;
   private final long maxEntries;
   private final FastByIDMap<FastByIDMap<RunningAverage>> averageDiffs;
   private final FastByIDMap<RunningAverage> averageItemPref;
@@ -69,14 +66,8 @@ public final class MemoryDiffStorage implements DiffStorage {
   
   /**
    * <p>
-   * Creates a new .
-   * </p>
-   * 
-   * <p>
    * See {@link org.apache.mahout.cf.taste.impl.recommender.slopeone.SlopeOneRecommender} for the meaning of
-   * <code>stdDevWeighted</code>. If <code>compactAverages</code> is set, this uses alternate data structures
-   * ({@link CompactRunningAverage} versus {@link FullRunningAverage}) that use almost 50% less memory but
-   * store item-item averages less accurately. <code>maxEntries</code> controls the maximum number of
+   * <code>stdDevWeighted</code>. <code>maxEntries</code> controls the maximum number of
    * item-item average preference differences that will be tracked internally. After the limit is reached, if
    * a new item-item pair is observed in the data it will be ignored. This is recommended for large datasets.
    * The first <code>maxEntries</code> item-item pairs observed in the data are tracked. Assuming that item
@@ -89,9 +80,6 @@ public final class MemoryDiffStorage implements DiffStorage {
    * 
    * @param stdDevWeighted
    *          see {@link org.apache.mahout.cf.taste.impl.recommender.slopeone.SlopeOneRecommender}
-   * @param compactAverages
-   *          if <code>true</code>, use {@link CompactRunningAverage} instead of {@link FullRunningAverage}
-   *          internally
    * @param maxEntries
    *          maximum number of item-item average preference differences to track internally
    * @throws IllegalArgumentException
@@ -99,14 +87,12 @@ public final class MemoryDiffStorage implements DiffStorage {
    */
   public MemoryDiffStorage(DataModel dataModel,
                            Weighting stdDevWeighted,
-                           boolean compactAverages,
                            long maxEntries) throws TasteException {
     Preconditions.checkArgument(dataModel != null, "dataModel is null");
     Preconditions.checkArgument(dataModel.getNumItems() >= 1, "dataModel has no items");
     Preconditions.checkArgument(maxEntries > 0L, "maxEntries must be positive");
     this.dataModel = dataModel;
     this.stdDevWeighted = stdDevWeighted == Weighting.WEIGHTED;
-    this.compactAverages = compactAverages;
     this.maxEntries = maxEntries;
     this.averageDiffs = new FastByIDMap<FastByIDMap<RunningAverage>>();
     this.averageItemPref = new FastByIDMap<RunningAverage>();
@@ -175,10 +161,53 @@ public final class MemoryDiffStorage implements DiffStorage {
   public RunningAverage getAverageItemPref(long itemID) {
     return averageItemPref.get(itemID);
   }
+
+  @Override
+  public void addItemPref(long userID, long itemIDA, float prefValue) throws TasteException {
+    PreferenceArray userPreferences = dataModel.getPreferencesFromUser(userID);
+    try {
+      buildAverageDiffsLock.writeLock().lock();
+
+      FastByIDMap<RunningAverage> aMap = averageDiffs.get(itemIDA);
+      if (aMap == null) {
+        aMap = new FastByIDMap<RunningAverage>();
+        averageDiffs.put(itemIDA, aMap);
+      }
+
+      int length = userPreferences.length();
+      for (int i = 0; i < length; i++) {
+        long itemIDB = userPreferences.getItemID(i);
+        float bValue = userPreferences.getValue(i);
+        if (itemIDA < itemIDB) {
+          RunningAverage average = aMap.get(itemIDB);
+          if (average == null) {
+            average = buildRunningAverage();
+            aMap.put(itemIDB, average);
+          }
+          average.addDatum(bValue - prefValue);
+        } else {
+          FastByIDMap<RunningAverage> bMap = averageDiffs.get(itemIDB);
+          if (bMap == null) {
+            bMap = new FastByIDMap<RunningAverage>();
+            averageDiffs.put(itemIDB, bMap);
+          }
+          RunningAverage average = bMap.get(itemIDA);
+          if (average == null) {
+            average = buildRunningAverage();
+            bMap.put(itemIDA, average);
+          }
+          average.addDatum(prefValue - bValue);
+        }
+      }
+
+    } finally {
+      buildAverageDiffsLock.writeLock().unlock();
+    }
+  }
   
   @Override
-  public void updateItemPref(long itemID, float prefDelta, boolean remove) {
-    if (!remove && stdDevWeighted) {
+  public void updateItemPref(long itemID, float prefDelta) {
+    if (stdDevWeighted) {
       throw new UnsupportedOperationException("Can't update only when stdDevWeighted is set");
     }
     try {
@@ -188,17 +217,9 @@ public final class MemoryDiffStorage implements DiffStorage {
         for (Map.Entry<Long,RunningAverage> entry2 : entry.getValue().entrySet()) {
           RunningAverage average = entry2.getValue();
           if (matchesItemID1) {
-            if (remove) {
-              average.removeDatum(prefDelta);
-            } else {
-              average.changeDatum(-prefDelta);
-            }
+            average.changeDatum(-prefDelta);
           } else if (itemID == entry2.getKey()) {
-            if (remove) {
-              average.removeDatum(-prefDelta);
-            } else {
-              average.changeDatum(prefDelta);
-            }
+            average.changeDatum(prefDelta);
           }
         }
       }
@@ -208,6 +229,55 @@ public final class MemoryDiffStorage implements DiffStorage {
       }
     } finally {
       buildAverageDiffsLock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public void removeItemPref(long userID, long itemIDA, float prefValue) throws TasteException {
+    PreferenceArray userPreferences = dataModel.getPreferencesFromUser(userID);
+    try {
+      buildAverageDiffsLock.writeLock().lock();
+
+      FastByIDMap<RunningAverage> aMap = averageDiffs.get(itemIDA);
+
+      int length = userPreferences.length();
+      for (int i = 0; i < length; i++) {
+
+        long itemIDB = userPreferences.getItemID(i);
+        float bValue = userPreferences.getValue(i);
+
+        if (itemIDA < itemIDB) {
+
+          if (aMap != null) {
+            RunningAverage average = aMap.get(itemIDB);
+            if (average != null) {
+              if (average.getCount() <= 1) {
+                aMap.remove(itemIDB);
+              } else {
+                average.removeDatum(bValue - prefValue);
+              }
+            }
+          }
+
+        } else  if (itemIDA > itemIDB) {
+
+          FastByIDMap<RunningAverage> bMap = averageDiffs.get(itemIDB);
+          if (bMap != null) {
+            RunningAverage average = bMap.get(itemIDA);
+            if (average != null) {
+              if (average.getCount() <= 1) {
+                aMap.remove(itemIDA);
+              } else {
+                average.removeDatum(prefValue - bValue);
+              }
+            }
+          }
+
+        }
+      }
+
+    } finally {
+      buildAverageDiffsLock.writeLock().unlock();
     }
   }
   
@@ -321,11 +391,7 @@ public final class MemoryDiffStorage implements DiffStorage {
   }
   
   private RunningAverage buildRunningAverage() {
-    if (stdDevWeighted) {
-      return compactAverages ? new CompactRunningAverageAndStdDev() : new FullRunningAverageAndStdDev();
-    } else {
-      return compactAverages ? new CompactRunningAverage() : new FullRunningAverage();
-    }
+    return stdDevWeighted ? new FullRunningAverageAndStdDev() : new FullRunningAverage();
   }
   
   @Override

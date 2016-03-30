@@ -17,9 +17,6 @@
 
 package org.apache.mahout.cf.taste.impl.common.jdbc;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -48,8 +45,7 @@ public abstract class AbstractJDBCComponent {
   }
   
   protected static void checkNotNullAndLog(String argName, Object[] values) {
-    Preconditions.checkArgument(values != null && values.length != 0,
-      argName + " is null or zero-length" );
+    Preconditions.checkArgument(values != null && values.length != 0, argName + " is null or zero-length");
     for (Object value : values) {
       checkNotNullAndLog(argName, value);
     }
@@ -87,10 +83,6 @@ public abstract class AbstractJDBCComponent {
   
   protected int getFetchSize() {
     return DEFAULT_FETCH_SIZE;
-  }
-  
-  protected void advanceResultSet(ResultSet resultSet, int n) throws SQLException {
-    resultSet.relative(n);
   }
   
 }

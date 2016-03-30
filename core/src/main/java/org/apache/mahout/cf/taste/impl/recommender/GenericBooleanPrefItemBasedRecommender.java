@@ -21,6 +21,7 @@ import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.PreferenceArray;
 import org.apache.mahout.cf.taste.recommender.CandidateItemsStrategy;
+import org.apache.mahout.cf.taste.recommender.MostSimilarItemsCandidateItemsStrategy;
 import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
 
 /**
@@ -35,10 +36,10 @@ public final class GenericBooleanPrefItemBasedRecommender extends GenericItemBas
     super(dataModel, similarity);
   }
 
-  public GenericBooleanPrefItemBasedRecommender(DataModel dataModel,
-                                                ItemSimilarity similarity,
-                                                CandidateItemsStrategy candidateItemsStrategy) {
-    super(dataModel, similarity, candidateItemsStrategy);
+  public GenericBooleanPrefItemBasedRecommender(DataModel dataModel, ItemSimilarity similarity,
+      CandidateItemsStrategy candidateItemsStrategy, MostSimilarItemsCandidateItemsStrategy
+      mostSimilarItemsCandidateItemsStrategy) {
+    super(dataModel, similarity, candidateItemsStrategy, mostSimilarItemsCandidateItemsStrategy);
   }
   
   /**
@@ -48,9 +49,9 @@ public final class GenericBooleanPrefItemBasedRecommender extends GenericItemBas
    * sum of similarities.
    */
   @Override
-  protected float doEstimatePreference(long userID, long itemID) throws TasteException {
-    PreferenceArray prefs = getDataModel().getPreferencesFromUser(userID);
-    double[] similarities = getSimilarity().itemSimilarities(itemID, prefs.getIDs());
+  protected float doEstimatePreference(long userID, PreferenceArray preferencesFromUser, long itemID)
+    throws TasteException {
+    double[] similarities = getSimilarity().itemSimilarities(itemID, preferencesFromUser.getIDs());
     boolean foundAPref = false;
     double totalSimilarity = 0.0;
     for (double theSimilarity : similarities) {

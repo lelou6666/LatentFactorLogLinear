@@ -17,6 +17,7 @@
 
 package org.apache.mahout.math.hadoop;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,6 +36,7 @@ import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileValueIterator;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.RandomAccessSparseVector;
 import org.apache.mahout.math.SequentialAccessSparseVector;
@@ -58,21 +60,37 @@ public final class TimesSquaredJob {
 
   private TimesSquaredJob() { }
 
-  public static JobConf createTimesSquaredJobConf(Vector v, 
-                                                  Path matrixInputPath, 
-                                                  Path outputVectorPath) throws IOException {
-    return createTimesSquaredJobConf(v,
+  public static Configuration createTimesSquaredJobConf(Vector v, Path matrixInputPath, Path outputVectorPath)
+    throws IOException {
+    return createTimesSquaredJobConf(new Configuration(), v, matrixInputPath, outputVectorPath);
+  }
+  
+  public static Configuration createTimesSquaredJobConf(Configuration initialConf,
+                                                        Vector v,
+                                                        Path matrixInputPath,
+                                                        Path outputVectorPath) throws IOException {
+    return createTimesSquaredJobConf(initialConf, 
+                                     v,
                                      matrixInputPath,
                                      outputVectorPath,
                                      TimesSquaredMapper.class,
                                      VectorSummingReducer.class);
   }
 
-  public static JobConf createTimesJobConf(Vector v,
-                                           int outDim,
-                                           Path matrixInputPath,
-                                           Path outputVectorPath) throws IOException {
-    return createTimesSquaredJobConf(v,
+  public static Configuration createTimesJobConf(Vector v,
+                                                 int outDim,
+                                                 Path matrixInputPath,
+                                                 Path outputVectorPath) throws IOException {
+    return createTimesJobConf(new Configuration(), v, outDim, matrixInputPath, outputVectorPath);
+  }
+    
+  public static Configuration createTimesJobConf(Configuration initialConf, 
+                                                 Vector v,
+                                                 int outDim,
+                                                 Path matrixInputPath,
+                                                 Path outputVectorPath) throws IOException {
+    return createTimesSquaredJobConf(initialConf,
+                                     v,
                                      outDim,
                                      matrixInputPath,
                                      outputVectorPath,
@@ -80,22 +98,57 @@ public final class TimesSquaredJob {
                                      VectorSummingReducer.class);
   }
 
-
-  public static JobConf createTimesSquaredJobConf(Vector v,
-                                                  Path matrixInputPath,
-                                                  Path outputVectorPathBase,
-                                                  Class<? extends TimesSquaredMapper> mapClass,
-                                                  Class<? extends VectorSummingReducer> redClass) throws IOException {
-    return createTimesSquaredJobConf(v, v.size(), matrixInputPath, outputVectorPathBase, mapClass, redClass);
+  public static Configuration createTimesSquaredJobConf(Vector v,
+                                                        Path matrixInputPath,
+                                                        Path outputVectorPathBase,
+                                                        Class<? extends TimesSquaredMapper> mapClass,
+                                                        Class<? extends VectorSummingReducer> redClass)
+    throws IOException {
+    return createTimesSquaredJobConf(new Configuration(), v, matrixInputPath, outputVectorPathBase, mapClass, redClass);
+  }
+  
+  public static Configuration createTimesSquaredJobConf(Configuration initialConf,
+                                                        Vector v,
+                                                        Path matrixInputPath,
+                                                        Path outputVectorPathBase,
+                                                        Class<? extends TimesSquaredMapper> mapClass,
+                                                        Class<? extends VectorSummingReducer> redClass)
+    throws IOException {
+    return createTimesSquaredJobConf(initialConf, 
+                                     v, 
+                                     v.size(), 
+                                     matrixInputPath, 
+                                     outputVectorPathBase, 
+                                     mapClass, 
+                                     redClass);
   }
 
-  public static JobConf createTimesSquaredJobConf(Vector v,
-                                                  int outputVectorDim,
-                                                  Path matrixInputPath,
-                                                  Path outputVectorPathBase,
-                                                  Class<? extends TimesSquaredMapper> mapClass,
-                                                  Class<? extends VectorSummingReducer> redClass) throws IOException {
-    JobConf conf = new JobConf(TimesSquaredJob.class);
+  public static Configuration createTimesSquaredJobConf(Vector v,
+                                                        int outputVectorDim,
+                                                        Path matrixInputPath,
+                                                        Path outputVectorPathBase,
+                                                        Class<? extends TimesSquaredMapper> mapClass,
+                                                        Class<? extends VectorSummingReducer> redClass)
+    throws IOException {
+
+    return createTimesSquaredJobConf(new Configuration(),
+                                     v,
+                                     outputVectorDim,
+                                     matrixInputPath,
+                                     outputVectorPathBase,
+                                     mapClass,
+                                     redClass);
+  }
+  
+  public static Configuration createTimesSquaredJobConf(Configuration initialConf, 
+                                                        Vector v,
+                                                        int outputVectorDim,
+                                                        Path matrixInputPath,
+                                                        Path outputVectorPathBase,
+                                                        Class<? extends TimesSquaredMapper> mapClass,
+                                                        Class<? extends VectorSummingReducer> redClass)
+    throws IOException {
+    JobConf conf = new JobConf(initialConf, TimesSquaredJob.class);
     conf.setJobName("TimesSquaredJob: " + matrixInputPath);
     FileSystem fs = FileSystem.get(conf);
     matrixInputPath = fs.makeQualified(matrixInputPath);
@@ -110,7 +163,6 @@ public final class TimesSquaredJob {
     inputVectorPathWriter.close();
     URI ivpURI = inputVectorPath.toUri();
     DistributedCache.setCacheFiles(new URI[] {ivpURI}, conf);
-    fs.deleteOnExit(inputVectorPath);
 
     conf.set(INPUT_VECTOR, ivpURI.toString());
     conf.setBoolean(IS_SPARSE_OUTPUT, !(v instanceof DenseVector));
@@ -129,17 +181,13 @@ public final class TimesSquaredJob {
     return conf;
   }
 
-  public static Vector retrieveTimesSquaredOutputVector(JobConf conf) throws IOException {
-    Path outputPath = FileOutputFormat.getOutputPath(conf);
-    FileSystem fs = FileSystem.get(conf);
+  public static Vector retrieveTimesSquaredOutputVector(Configuration conf) throws IOException {
+    Path outputPath = FileOutputFormat.getOutputPath(new JobConf(conf));
     Path outputFile = new Path(outputPath, "part-00000");
-    SequenceFile.Reader reader = new SequenceFile.Reader(fs, outputFile, conf);
-    NullWritable n = NullWritable.get();
-    VectorWritable v = new VectorWritable();
-    reader.next(n,v);
-    Vector vector = v.get();
-    reader.close();
-    fs.deleteOnExit(outputFile);
+    SequenceFileValueIterator<VectorWritable> iterator =
+        new SequenceFileValueIterator<VectorWritable>(outputFile, true, conf);
+    Vector vector = iterator.next().get();
+    iterator.close();
     return vector;
   }
 
@@ -155,16 +203,14 @@ public final class TimesSquaredJob {
       try {
         URI[] localFiles = DistributedCache.getCacheFiles(conf);
         Preconditions.checkArgument(localFiles != null && localFiles.length >= 1,
-          "missing paths from the DistributedCache" );
+                                    "missing paths from the DistributedCache");
         Path inputVectorPath = new Path(localFiles[0].getPath());
-        FileSystem fs = inputVectorPath.getFileSystem(conf);
 
-        SequenceFile.Reader reader = new SequenceFile.Reader(fs, inputVectorPath, conf);
-        VectorWritable val = new VectorWritable();
-        NullWritable nw = NullWritable.get();
-        reader.next(nw, val);
-        reader.close();
-        inputVector = val.get();
+        SequenceFileValueIterator<VectorWritable> iterator =
+            new SequenceFileValueIterator<VectorWritable>(inputVectorPath, true, conf);
+        inputVector = iterator.next().get();
+        iterator.close();
+
         if (!(inputVector instanceof SequentialAccessSparseVector || inputVector instanceof DenseVector)) {
           inputVector = new SequentialAccessSparseVector(inputVector);
         }

@@ -17,16 +17,19 @@
 
 package org.apache.mahout.math.hadoop;
 
-import org.apache.hadoop.fs.FileStatus;
+import com.google.common.base.Function;
+import com.google.common.collect.Iterators;
+import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobClient;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.JobConfigurable;
-import org.apache.mahout.common.IOUtils;
+import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.PathType;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileDirIterator;
 import org.apache.mahout.math.CardinalityException;
 import org.apache.mahout.math.MatrixSlice;
 import org.apache.mahout.math.Vector;
@@ -39,8 +42,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
-
 
 /**
  * DistributedRowMatrix is a FileSystem-backed VectorIterable in which the vectors live in a
@@ -50,7 +51,7 @@ import java.util.NoSuchElementException;
  * <pre>
  *   // the path must already contain an already created SequenceFile!
  *   DistributedRowMatrix m = new DistributedRowMatrix("path/to/vector/sequenceFile", "tmp/path", 10000000, 250000);
- *   m.configure(new JobConf());
+ *   m.setConf(new Configuration());
  *   // now if we want to multiply a vector by this matrix, it's dimension must equal the row dimension of this
  *   // matrix.  If we want to timesSquared() a vector by this matrix, its dimension must equal the column dimension
  *   // of the matrix.
@@ -60,17 +61,19 @@ import java.util.NoSuchElementException;
  * </pre>
  *
  */
-public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
-
+public class DistributedRowMatrix implements VectorIterable, Configurable {
+  public static final String KEEP_TEMP_FILES = "DistributedMatrix.keep.temp.files";
+  
   private static final Logger log = LoggerFactory.getLogger(DistributedRowMatrix.class);
 
   private final Path inputPath;
   private final Path outputTmpPath;
-  private JobConf conf;
+  private Configuration conf;
   private Path rowPath;
   private Path outputTmpBasePath;
   private final int numRows;
   private final int numCols;
+  private boolean keepTempFiles;
 
   public DistributedRowMatrix(Path inputPathString,
                               Path outputTmpPathString,
@@ -80,14 +83,21 @@ public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
     this.outputTmpPath = outputTmpPathString;
     this.numRows = numRows;
     this.numCols = numCols;
+    this.keepTempFiles = false;
   }
 
   @Override
-  public void configure(JobConf conf) {
+  public Configuration getConf() {
+    return conf;
+  }
+
+  @Override
+  public void setConf(Configuration conf) {
     this.conf = conf;
     try {
       rowPath = FileSystem.get(conf).makeQualified(inputPath);
       outputTmpBasePath = FileSystem.get(conf).makeQualified(outputTmpPath);
+      keepTempFiles = conf.getBoolean(KEEP_TEMP_FILES, false);
     } catch (IOException ioe) {
       throw new IllegalStateException(ioe);
     }
@@ -96,7 +106,7 @@ public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
   public Path getRowPath() {
     return rowPath;
   }
-  
+
   public Path getOutputTempPath() {
     return outputTmpBasePath;
   }
@@ -113,8 +123,15 @@ public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
   @Override
   public Iterator<MatrixSlice> iterateAll() {
     try {
-      FileSystem fs = FileSystem.get(conf);
-      return new DistributedMatrixIterator(fs, rowPath, conf);
+      return Iterators.transform(
+          new SequenceFileDirIterator<IntWritable,VectorWritable>(new Path(rowPath, "*"),
+                                                                  PathType.GLOB, null, null, true, conf),
+          new Function<Pair<IntWritable,VectorWritable>,MatrixSlice>() {
+            @Override
+            public MatrixSlice apply(Pair<IntWritable, VectorWritable> from) {
+              return new MatrixSlice(from.getSecond().get(), from.getFirst().get());
+            }
+          });
     } catch (IOException ioe) {
       throw new IllegalStateException(ioe);
     }
@@ -139,39 +156,55 @@ public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
    * This implements matrix this.transpose().times(other)
    * @param other   a DistributedRowMatrix
    * @return    a DistributedRowMatrix containing the product
-   * @throws IOException
    */
   public DistributedRowMatrix times(DistributedRowMatrix other) throws IOException {
     if (numRows != other.numRows()) {
       throw new CardinalityException(numRows, other.numRows());
     }
     Path outPath = new Path(outputTmpBasePath.getParent(), "productWith-" + (System.nanoTime() & 0xFF));
-    JobConf conf = MatrixMultiplicationJob.createMatrixMultiplyJobConf(rowPath, other.rowPath, outPath, other.numCols);
-    JobClient.runJob(conf);
+    
+    Configuration initialConf = getConf() == null ? new Configuration() : getConf();
+    Configuration conf =
+        MatrixMultiplicationJob.createMatrixMultiplyJobConf(initialConf, 
+                                                            rowPath, 
+                                                            other.rowPath, 
+                                                            outPath, 
+                                                            other.numCols);
+    JobClient.runJob(new JobConf(conf));
     DistributedRowMatrix out = new DistributedRowMatrix(outPath, outputTmpPath, numCols, other.numCols());
-    out.configure(conf);
+    out.setConf(conf);
     return out;
   }
 
   public DistributedRowMatrix transpose() throws IOException {
     Path outputPath = new Path(rowPath.getParent(), "transpose-" + (System.nanoTime() & 0xFF));
-    JobConf conf = TransposeJob.buildTransposeJobConf(rowPath, outputPath, numRows);
-    JobClient.runJob(conf);
+    Configuration initialConf = getConf() == null ? new Configuration() : getConf();
+    Configuration conf = TransposeJob.buildTransposeJobConf(initialConf, rowPath, outputPath, numRows);
+    JobClient.runJob(new JobConf(conf));
     DistributedRowMatrix m = new DistributedRowMatrix(outputPath, outputTmpPath, numCols, numRows);
-    m.configure(this.conf);
+    m.setConf(this.conf);
     return m;
   }
 
   @Override
   public Vector times(Vector v) {
     try {
-      JobConf conf = TimesSquaredJob.createTimesJobConf(v,
-                                                        numRows,
-                                                        rowPath,
-                                                        new Path(outputTmpPath,
-                                                                 Long.toString(System.nanoTime())));
-      JobClient.runJob(conf);
-      return TimesSquaredJob.retrieveTimesSquaredOutputVector(conf);
+      Configuration initialConf = getConf() == null ? new Configuration() : getConf();
+      Path outputVectorTmpPath = new Path(outputTmpBasePath,
+                                          new Path(Long.toString(System.nanoTime())));
+      Configuration conf =
+          TimesSquaredJob.createTimesJobConf(initialConf, 
+                                             v,
+                                             numRows,
+                                             rowPath,
+                                             outputVectorTmpPath);
+      JobClient.runJob(new JobConf(conf));
+      Vector result = TimesSquaredJob.retrieveTimesSquaredOutputVector(conf);
+      if (!keepTempFiles) {
+        FileSystem fs = outputVectorTmpPath.getFileSystem(conf);
+        fs.delete(outputVectorTmpPath, true);
+      }
+      return result;
     } catch (IOException ioe) {
       throw new IllegalStateException(ioe);
     }
@@ -180,76 +213,29 @@ public class DistributedRowMatrix implements VectorIterable, JobConfigurable {
   @Override
   public Vector timesSquared(Vector v) {
     try {
-      JobConf conf = TimesSquaredJob.createTimesSquaredJobConf(v,
-                                                               rowPath,
-                                                               new Path(outputTmpBasePath,
-                                                                        new Path(Long.toString(System.nanoTime()))));
-      JobClient.runJob(conf);
-      return TimesSquaredJob.retrieveTimesSquaredOutputVector(conf);
+      Configuration initialConf = getConf() == null ? new Configuration() : getConf();
+      Path outputVectorTmpPath = new Path(outputTmpBasePath,
+               new Path(Long.toString(System.nanoTime())));
+      Configuration conf =
+          TimesSquaredJob.createTimesSquaredJobConf(initialConf,
+                                                    v,
+                                                    rowPath,
+                                                    outputVectorTmpPath);
+      JobClient.runJob(new JobConf(conf));
+      Vector result = TimesSquaredJob.retrieveTimesSquaredOutputVector(conf);
+      if (!keepTempFiles) {
+        FileSystem fs = outputVectorTmpPath.getFileSystem(conf);
+        fs.delete(outputVectorTmpPath, true);
+      }
+      return result;
     } catch (IOException ioe) {
       throw new IllegalStateException(ioe);
     }
   }
-  
+
   @Override
   public Iterator<MatrixSlice> iterator() {
     return iterateAll();
-  }
-
-  public static class DistributedMatrixIterator implements Iterator<MatrixSlice> {
-    private SequenceFile.Reader reader;
-    private final FileStatus[] statuses;
-    private boolean hasBuffered;
-    private boolean hasNext;
-    private int statusIndex;
-    private final FileSystem fs;
-    private final JobConf conf;
-    private final IntWritable i = new IntWritable();
-    private final VectorWritable v = new VectorWritable();
-
-    public DistributedMatrixIterator(FileSystem fs, Path rowPath, JobConf conf) throws IOException {
-      this.fs = fs;
-      this.conf = conf;
-      statuses = fs.globStatus(new Path(rowPath, "*"));
-      reader = new SequenceFile.Reader(fs, statuses[statusIndex].getPath(), conf);
-    }
-
-    @Override
-    public boolean hasNext() {
-      try {
-        if (!hasBuffered) {
-          hasNext = reader.next(i, v);
-          if (!hasNext && statusIndex < statuses.length - 1) {
-            statusIndex++;
-            reader = new SequenceFile.Reader(fs, statuses[statusIndex].getPath(), conf);
-            hasNext = reader.next(i, v);
-          }
-          hasBuffered = true;
-        }
-      } catch (IOException ioe) {
-        throw new IllegalStateException(ioe);
-      } finally {
-        if (!hasNext) {
-          IOUtils.quietClose(reader);
-        }
-      }
-      return hasNext;
-
-    }
-
-    @Override
-    public MatrixSlice next() {
-      if (!hasBuffered && !hasNext()) {
-        throw new NoSuchElementException();
-      }
-      hasBuffered = false;
-      return new MatrixSlice(v.get(), i.get());
-    }
-
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException("Cannot remove from DistributedMatrixIterator");
-    }
   }
 
   public static class MatrixEntryWritable implements WritableComparable<MatrixEntryWritable> {

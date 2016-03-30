@@ -19,10 +19,7 @@ package org.apache.mahout.utils.vectors.arff;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.Charset;
@@ -30,12 +27,10 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Iterator;
 import java.util.Locale;
-import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 
-import org.apache.mahout.common.IOUtils;
-import org.apache.mahout.math.DenseVector;
-import org.apache.mahout.math.RandomAccessSparseVector;
+import com.google.common.base.Charsets;
+import com.google.common.io.Files;
 import org.apache.mahout.math.Vector;
 
 /**
@@ -56,16 +51,16 @@ public class ARFFVectorIterable implements Iterable<Vector> {
   
   private static final Pattern COMMA_PATTERN = Pattern.compile(",");
   private static final Pattern SPACE_PATTERN = Pattern.compile(" ");
-  
+
   private final BufferedReader buff;
   private final ARFFModel model;
   
   public ARFFVectorIterable(File file, ARFFModel model) throws IOException {
-    this(new FileReader(file), model);
+    this(file, Charsets.UTF_8, model);
   }
   
   public ARFFVectorIterable(File file, Charset encoding, ARFFModel model) throws IOException {
-    this(new InputStreamReader(new FileInputStream(file), encoding), model);
+    this(Files.newReader(file, encoding), model);
   }
   
   public ARFFVectorIterable(String arff, ARFFModel model) throws IOException {
@@ -83,7 +78,6 @@ public class ARFFVectorIterable implements Iterable<Vector> {
     
     int labelNumber = 0;
     String line;
-    //boolean inData = false; // TODO not used?
     while ((line = buff.readLine()) != null) {
       line = line.trim();
       String lower = line.toLowerCase(Locale.ENGLISH);
@@ -143,75 +137,11 @@ public class ARFFVectorIterable implements Iterable<Vector> {
     
   }
   
-  
   @Override
   public Iterator<Vector> iterator() {
-    return new ARFFIterator();
+    return new ARFFIterator(buff, model);
   }
-  
-  private final class ARFFIterator implements Iterator<Vector> {
-    
-    private String line;
-    
-    private ARFFIterator() {
-      goToNext();
-    }
-    
-    private void goToNext() {
-      line = null;
-      try {
-        while ((line = buff.readLine()) != null) {
-          line = line.trim();
-          if (line.length() > 0 && !line.startsWith(ARFFModel.ARFF_COMMENT)) {
-            break;
-          }
-        }
-      } catch (IOException e) {
-        line = null;
-      }
-      if (line == null) {
-        IOUtils.quietClose(buff);
-      }
-    }
-    
-    @Override
-    public boolean hasNext() {
-      return line != null;
-    }
-    
-    @Override
-    public Vector next() {
-      if (line == null) {
-        throw new NoSuchElementException();
-      }
-      Vector result;
-      if (line.startsWith(ARFFModel.ARFF_SPARSE)) {
-        line = line.substring(1, line.length() - 1);
-        String[] splits = ARFFVectorIterable.COMMA_PATTERN.split(line);
-        result = new RandomAccessSparseVector(model.getLabelSize());
-        for (String split : splits) {
-          String[] data = ARFFVectorIterable.SPACE_PATTERN.split(split); // first is index, second is
-          int idx = Integer.parseInt(data[0]);
-          result.setQuick(idx, model.getValue(data[1], idx));
-        }
-      } else {
-        result = new DenseVector(model.getLabelSize());
-        String[] splits = ARFFVectorIterable.COMMA_PATTERN.split(line);
-        for (int i = 0; i < splits.length; i++) {
-          result.setQuick(i, model.getValue(splits[i], i));
-        }
-      }
-      //result.setLabelBindings(labelBindings);
-      goToNext();
-      return result;
-    }
-    
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException("remove not supported");
-    }
-  }
-  
+
   /**
    * Returns info about the ARFF content that was parsed.
    * @return the model

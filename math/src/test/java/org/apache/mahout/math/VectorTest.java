@@ -175,11 +175,6 @@ public final class VectorTest extends MahoutTestCase {
     right.setQuick(2, 6);
     double result = left.dot(right);
     assertEquals(32.0, result, EPSILON);
-    String formattedString = left.asFormatString();
-    //System.out.println("Vec: " + formattedString);
-    Vector vec = AbstractVector.decodeVector(formattedString);
-    assertNotNull(vec);
-    assertEquals(vec, left);
   }
 
   @Test
@@ -445,8 +440,7 @@ public final class VectorTest extends MahoutTestCase {
     double cube = Math.pow(36, 1.0 / 3);
     expected = vec1.divide(cube);
 
-    assertEquals("norm: " + norm.asFormatString() + " is not equal to expected: "
-        + expected.asFormatString(), norm, expected);
+    assertEquals(norm, expected);
 
     norm = vec1.normalize(Double.POSITIVE_INFINITY);
     norm2 = vec2.normalize(Double.POSITIVE_INFINITY);
@@ -454,18 +448,15 @@ public final class VectorTest extends MahoutTestCase {
     expected.setQuick(0, 1.0 / 3);
     expected.setQuick(1, 2.0 / 3);
     expected.setQuick(2, 3.0 / 3);
-    assertEquals("norm: " + norm.asFormatString() + " is not equal to expected: "
-        + expected.asFormatString(), norm, expected);
-    assertEquals("norm: " + norm2.asFormatString() + " is not equal to expected: "
-        + expected.asFormatString(), norm2, expected);
+    assertEquals(norm, expected);
+    assertEquals(norm2, expected);
 
     norm = vec1.normalize(0);
     // The max is 3, so we divide by that.
     expected.setQuick(0, 1.0 / 3);
     expected.setQuick(1, 2.0 / 3);
     expected.setQuick(2, 3.0 / 3);
-    assertEquals("norm: " + norm.asFormatString() + " is not equal to expected: "
-        + expected.asFormatString(), norm, expected);
+    assertEquals(norm, expected);
 
     try {
       vec1.normalize(-1);
@@ -499,42 +490,47 @@ public final class VectorTest extends MahoutTestCase {
     vec2.setQuick(2, 3);
     Vector norm2 = vec2.logNormalize();
     assertNotNull("norm1 is null and it shouldn't be", norm2);
-    
-    Vector expected = new RandomAccessSparseVector(3);
-    
-    expected.setQuick(0, 0.2672612419124244);
-    expected.setQuick(1, 0.4235990463273581);
-    expected.setQuick(2, 0.5345224838248488);
-    
-    assertEquals(expected, norm);
-    
+
+    Vector expected = new DenseVector(new double[]{
+      0.2672612419124244, 0.4235990463273581, 0.5345224838248488
+    });
+
+    assertVectorEquals(expected, norm, 1.0e-15);
+    assertVectorEquals(expected, norm2, 1.0e-15);
+
     norm = vec1.logNormalize(2);
-    assertEquals(expected, norm);
+    assertVectorEquals(expected, norm, 1.0e-15);
     
     norm2 = vec2.logNormalize(2);
-    assertEquals(expected, norm2);
+    assertVectorEquals(expected, norm2, 1.0e-15);
     
     try {
-      norm = vec1.logNormalize(1);
-      fail();
+      vec1.logNormalize(1);
+      fail("Should fail with power == 1");
     } catch (IllegalArgumentException e) {
       // expected
     }
-    norm = vec1.logNormalize(3);
-  
+
     try {
       vec1.logNormalize(-1);
-      fail();
+      fail("Should fail with negative power");
     } catch (IllegalArgumentException e) {
       // expected
     }
     
     try {
-      vec2.logNormalize(Double.POSITIVE_INFINITY);
-      fail();
+      norm = vec2.logNormalize(Double.POSITIVE_INFINITY);
+      fail("Should fail with positive infinity norm");
     } catch (IllegalArgumentException e) {
       // expected
     }  
+  }
+
+  private static void assertVectorEquals(Vector expected, Vector actual, double epsilon) {
+    assertEquals(expected.size(), actual.size());
+    for (Vector.Element x : expected) {
+      assertEquals(x.get(), actual.get(x.index()), epsilon);
+    }
   }
 
   @Test
@@ -827,26 +823,10 @@ public final class VectorTest extends MahoutTestCase {
   }
 
   @Test
-  public void testNameSerialization()  {
-    double[] values = {1.1, 2.2, 3.3};
-    Vector test = new DenseVector(values);
-    String formatString = test.asFormatString();
-
-    Vector decode = AbstractVector.decodeVector(formatString);
-    assertEquals("test and decode are not equal", test, decode);
-
-    Vector noName = new DenseVector(values);
-    formatString = noName.asFormatString();
-
-    decode = AbstractVector.decodeVector(formatString);
-    assertEquals("noName and decode are not equal", noName, decode);
-  }
-
-  @Test
   public void testHashCodeEquivalence() {
     // Hash codes must be equal if the vectors are considered equal
     Vector sparseLeft = new RandomAccessSparseVector(3);
-    DenseVector denseRight = new DenseVector(3);
+    Vector denseRight = new DenseVector(3);
     sparseLeft.setQuick(0, 1);
     sparseLeft.setQuick(1, 2);
     sparseLeft.setQuick(2, 3);
@@ -863,7 +843,7 @@ public final class VectorTest extends MahoutTestCase {
     assertEquals(sparseLeft, denseRight);
     assertEquals(sparseLeft.hashCode(), denseRight.hashCode());
 
-    DenseVector denseLeft = new DenseVector(3);
+    Vector denseLeft = new DenseVector(3);
     denseLeft.setQuick(0, 1);
     denseLeft.setQuick(1, 2);
     denseLeft.setQuick(2, 3);

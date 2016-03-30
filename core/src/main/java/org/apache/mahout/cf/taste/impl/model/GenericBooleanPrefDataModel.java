@@ -82,7 +82,7 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
       itemIDSet.addAll(itemIDs);
       LongPrimitiveIterator it = itemIDs.iterator();
       while (it.hasNext()) {
-        long itemID = it.next();
+        long itemID = it.nextLong();
         FastIDSet userIDs = preferenceForItems.get(itemID);
         if (userIDs == null) {
           userIDs = new FastIDSet(2);
@@ -181,14 +181,14 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
   public PreferenceArray getPreferencesFromUser(long userID) throws NoSuchUserException {
     FastIDSet itemIDs = preferenceFromUsers.get(userID);
     if (itemIDs == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     PreferenceArray prefArray = new BooleanUserPreferenceArray(itemIDs.size());
     int i = 0;
     LongPrimitiveIterator it = itemIDs.iterator();
     while (it.hasNext()) {
       prefArray.setUserID(i, userID);
-      prefArray.setItemID(i, it.next());
+      prefArray.setItemID(i, it.nextLong());
       i++;
     }
     return prefArray;
@@ -198,7 +198,7 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
   public FastIDSet getItemIDsFromUser(long userID) throws TasteException {
     FastIDSet itemIDs = preferenceFromUsers.get(userID);
     if (itemIDs == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     return itemIDs;
   }
@@ -212,13 +212,13 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
   public PreferenceArray getPreferencesForItem(long itemID) throws NoSuchItemException {
     FastIDSet userIDs = preferenceForItems.get(itemID);
     if (userIDs == null) {
-      throw new NoSuchItemException();
+      throw new NoSuchItemException(itemID);
     }
     PreferenceArray prefArray = new BooleanItemPreferenceArray(userIDs.size());
     int i = 0;
     LongPrimitiveIterator it = userIDs.iterator();
     while (it.hasNext()) {
-      prefArray.setUserID(i, it.next());
+      prefArray.setUserID(i, it.nextLong());
       prefArray.setItemID(i, itemID);
       i++;
     }
@@ -229,7 +229,7 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
   public Float getPreferenceValue(long userID, long itemID) throws NoSuchUserException {
     FastIDSet itemIDs = preferenceFromUsers.get(userID);
     if (itemIDs == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     if (itemIDs.contains(itemID)) {
       return 1.0f;
@@ -244,7 +244,7 @@ public final class GenericBooleanPrefDataModel extends AbstractDataModel {
     }
     FastByIDMap<Long> itemTimestamps = timestamps.get(userID);
     if (itemTimestamps == null) {
-      throw new NoSuchUserException();
+      throw new NoSuchUserException(userID);
     }
     return itemTimestamps.get(itemID);
   }

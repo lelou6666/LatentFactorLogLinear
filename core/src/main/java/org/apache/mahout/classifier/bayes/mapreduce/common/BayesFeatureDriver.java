@@ -56,7 +56,7 @@ public class BayesFeatureDriver implements BayesJob {
           "org.apache.hadoop.io.serializer.JavaSerialization,org.apache.hadoop.io.serializer.WritableSerialization");
     // this conf parameter needs to be set enable serialisation of conf values
 
-    HadoopUtil.overwriteOutput(output);
+    HadoopUtil.delete(conf, output);
     conf.set("bayes.parameters", params.toString());
     
     client.setConf(conf);
@@ -67,7 +67,8 @@ public class BayesFeatureDriver implements BayesJob {
   public static void main(String[] args) throws IOException {
     // test harness, delete me
     BayesFeatureDriver driver = new BayesFeatureDriver();
-    BayesParameters p = new BayesParameters(1);
+    BayesParameters p = new BayesParameters();
+    p.setGramSize(1);
     Path input = new Path("/home/drew/mahout/bayes/20news-input");
     Path output = new Path("/home/drew/mahout/bayes/20-news-features");
     driver.runJob(input, output, p);

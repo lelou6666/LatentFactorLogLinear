@@ -17,8 +17,9 @@
 
 package org.apache.mahout.df.mapreduce;
 
-import org.apache.hadoop.io.Writable;
 import org.apache.mahout.common.HadoopUtil;
+import org.apache.mahout.common.Pair;
+import org.apache.mahout.common.iterator.sequencefile.SequenceFileIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.mahout.df.DecisionForest;
@@ -42,7 +43,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.SequenceFile;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -59,19 +59,12 @@ public class Classifier {
   private static final Logger log = LoggerFactory.getLogger(Classifier.class);
 
   private final Path forestPath;
-
   private final Path inputPath;
-
   private final Path datasetPath;
-
   private final Configuration conf;
-
-  /**
-   * If not null, the Job will build the confusionMatrix.
-   */
+  /** If not null, the Job will build the confusionMatrix. */
   private final ResultAnalyzer analyzer;
   private final Dataset dataset;
-
   private final Path outputPath; // path that will containt the final output of the classifier
   private final Path mappersOutputPath; // mappers will output here
 
@@ -79,7 +72,12 @@ public class Classifier {
     return analyzer;
   }
 
-  public Classifier(Path forestPath, Path inputPath, Path datasetPath, Path outputPath, Configuration conf, boolean analyze) throws IOException {
+  public Classifier(Path forestPath,
+                    Path inputPath,
+                    Path datasetPath,
+                    Path outputPath,
+                    Configuration conf,
+                    boolean analyze) throws IOException {
     this.forestPath = forestPath;
     this.inputPath = inputPath;
     this.datasetPath = datasetPath;
@@ -144,49 +142,43 @@ public class Classifier {
 
     parseOutput(job);
 
-    HadoopUtil.overwriteOutput(mappersOutputPath);
+    HadoopUtil.delete(conf, mappersOutputPath);
   }
 
   /**
    * Extract the prediction for each mapper and write them in the corresponding output file. 
    * The name of the output file is based on the name of the corresponding input file.
    * Will compute the ConfusionMatrix if necessary.
-   * @param job
    */
   private void parseOutput(JobContext job) throws IOException {
     Configuration conf = job.getConfiguration();
     FileSystem fs = mappersOutputPath.getFileSystem(conf);
 
     Path[] outfiles = DFUtils.listOutputFiles(fs, mappersOutputPath);
-    FSDataOutputStream ofile = null;
 
     // read all the output
-    LongWritable key = new LongWritable();
-    Writable value = new Text();
     for (Path path : outfiles) {
-      SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, conf);
-
+      FSDataOutputStream ofile = null;
       try {
-        while (reader.next(key, value)) {
+        for (Pair<LongWritable,Text> record : new SequenceFileIterable<LongWritable,Text>(path, true, conf)) {
+          int key = (int) record.getFirst().get();
+          String value = record.getSecond().toString();
           if (ofile == null) {
             // this is the first value, it contains the name of the input file
-            ofile = fs.create(new Path(outputPath, value.toString()).suffix(".out"));
+            ofile = fs.create(new Path(outputPath, value).suffix(".out"));
           } else {
             // The key contains the correct label of the data. The value contains a prediction
-            ofile.writeChars(value.toString()); // write the prediction
+            ofile.writeChars(value); // write the prediction
             ofile.writeChar('\n');
 
             if (analyzer != null) {
-                analyzer.addInstance(
-                        dataset.getLabel((int)key.get()),
-                        new ClassifierResult(dataset.getLabel(Integer.parseInt(value.toString())), 1.0));
+              analyzer.addInstance(dataset.getLabel(key),
+                                   new ClassifierResult(dataset.getLabel(Integer.parseInt(value)), 1.0));
             }
           }
         }
       } finally {
-        reader.close();
         ofile.close();
-        ofile = null;
       }
     }
 
@@ -207,15 +199,10 @@ public class Classifier {
 
     /** used to convert input values to data instances */
     private DataConverter converter;
-
     private DecisionForest forest;
-
     private final Random rng = RandomUtils.getRandom();
-
     private boolean first = true;
-
     private final Text lvalue = new Text();
-
 
     @Override
     protected void setup(Context context) throws IOException, InterruptedException {

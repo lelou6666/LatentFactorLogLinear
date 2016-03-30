@@ -21,6 +21,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.io.WritableComparable;
 
 public class VarLongWritable implements WritableComparable<VarLongWritable>, Cloneable {
@@ -44,12 +45,12 @@ public class VarLongWritable implements WritableComparable<VarLongWritable>, Clo
 
   @Override
   public boolean equals(Object other) {
-    return other != null && VarLongWritable.class.equals(other.getClass()) && ((VarLongWritable) other).value == value;
+    return other != null && getClass().equals(other.getClass()) && ((VarLongWritable) other).value == value;
   }
 
   @Override
   public int hashCode() {
-    return (int) ((value >>> 32) ^ value);
+    return Longs.hashCode(value);
   }
 
   @Override

@@ -17,26 +17,15 @@
 
 package org.apache.mahout.math.hadoop.decomposer;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.mahout.common.AbstractJob;
 import org.apache.mahout.common.commandline.DefaultOptionCreator;
-import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.MatrixSlice;
 import org.apache.mahout.math.OrthonormalityVerifier;
 import org.apache.mahout.math.SparseRowMatrix;
@@ -49,6 +38,15 @@ import org.apache.mahout.math.decomposer.SingularVectorVerifier;
 import org.apache.mahout.math.hadoop.DistributedRowMatrix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * <p>Class for taking the output of an eigendecomposition (specified as a Path location), and verifies correctness,
@@ -126,7 +124,8 @@ public class EigenVerificationJob extends AbstractJob {
    * @param maxError a double representing the maximum error
    * @param minEigenValue a double representing the minimum eigenvalue
    * @param inMemory a boolean requesting in-memory preparation
-   * @param config the JobConf to use, or null if a default is ok (saves referencing JobConf in calling classes unless needed)
+   * @param conf the Configuration to use, or null if a default is ok
+   *  (saves referencing Configuration in calling classes unless needed)
    */
   public int run(Path corpusInput,
                  Path eigenInput,
@@ -135,17 +134,17 @@ public class EigenVerificationJob extends AbstractJob {
                  double maxError,
                  double minEigenValue,
                  boolean inMemory,
-                 JobConf config) throws IOException {
+                 Configuration conf) throws IOException {
     this.outPath = output;
     this.tmpOut = tempOut;
     this.maxError = maxError;
     this.minEigenValue = minEigenValue;
 
     if (eigenInput != null && eigensToVerify == null) {
-      prepareEigens(config, eigenInput, inMemory);
+      prepareEigens(conf, eigenInput, inMemory);
     }
     DistributedRowMatrix c = new DistributedRowMatrix(corpusInput, tempOut, 1, 1);
-    c.configure(config);
+    c.setConf(conf);
     corpus = c;
 
     // set up eigenverifier and orthoverifier TODO: allow multithreaded execution
@@ -193,7 +192,7 @@ public class EigenVerificationJob extends AbstractJob {
     for (Map.Entry<MatrixSlice, EigenStatus> pruneSlice : prunedEigenMeta) {
       MatrixSlice s = pruneSlice.getKey();
       EigenStatus meta = pruneSlice.getValue();
-      EigenVector ev = new EigenVector((DenseVector) s.vector(),
+      EigenVector ev = new EigenVector(s.vector(),
                                        meta.getEigenValue(),
                                        Math.abs(1 - meta.getCosAngle()),
                                        s.index());
@@ -226,8 +225,15 @@ public class EigenVerificationJob extends AbstractJob {
 
     Collections.sort(prunedEigenMeta, new Comparator<Map.Entry<MatrixSlice, EigenStatus>>() {
       @Override
-      public int compare(Map.Entry<MatrixSlice, EigenStatus> e1, Map.Entry<MatrixSlice, EigenStatus> e2) {
-        return e1.getKey().index() - e2.getKey().index();
+      public int compare(Map.Entry<MatrixSlice,EigenStatus> e1, Map.Entry<MatrixSlice,EigenStatus> e2) {
+        int index1 = e1.getKey().index();
+        int index2 = e2.getKey().index();
+        if (index1 < index2) {
+          return -1;
+        } else if (index1 > index2) {
+          return 1;
+        }
+        return 0;
       }
     });
     return prunedEigenMeta;
@@ -243,16 +249,18 @@ public class EigenVerificationJob extends AbstractJob {
     return eigenMetaData;
   }
 
-  private void prepareEigens(JobConf conf, Path eigenInput, boolean inMemory) {
+  private void prepareEigens(Configuration conf, Path eigenInput, boolean inMemory) {
     DistributedRowMatrix eigens = new DistributedRowMatrix(eigenInput, tmpOut, 1, 1);
-    eigens.configure(conf);
+    eigens.setConf(conf);
     if (inMemory) {
       List<Vector> eigenVectors = new ArrayList<Vector>();
       for (MatrixSlice slice : eigens) {
         eigenVectors.add(slice.vector());
       }
-      eigensToVerify = new SparseRowMatrix(new int[] { eigenVectors.size(), eigenVectors.get(0).size() }, eigenVectors
-          .toArray(new Vector[eigenVectors.size()]), true, true);
+      eigensToVerify = new SparseRowMatrix(new int[] {eigenVectors.size(), eigenVectors.get(0).size()},
+                                           eigenVectors.toArray(new Vector[eigenVectors.size()]),
+                                           true,
+                                           true);
 
     } else {
       eigensToVerify = eigens;
@@ -286,16 +294,16 @@ public class EigenVerificationJob extends AbstractJob {
     maxEigensToKeep = maxEigens;
     this.maxError = maxError;
     if (eigenInput != null && eigensToVerify == null) {
-      prepareEigens(new JobConf(conf), eigenInput, inMemory);
+      prepareEigens(new Configuration(conf), eigenInput, inMemory);
     }
 
     DistributedRowMatrix c = new DistributedRowMatrix(corpusInput, tmpOut, 1, 1);
-    c.configure(new JobConf(conf));
+    c.setConf(new Configuration(conf));
     corpus = c;
 
     eigenVerifier = new SimpleEigenVerifier();
     //OrthonormalityVerifier orthoVerifier = new OrthonormalityVerifier();
-    VectorIterable pairwiseInnerProducts = computePairwiseInnerProducts();
+    //VectorIterable pairwiseInnerProducts = computePairwiseInnerProducts();
     // FIXME: Why is the above vector computed if it is never used?
 
     Map<MatrixSlice, EigenStatus> eigenMetaData = verifyEigens();
